@@ -3,7 +3,6 @@ import Navbar from './components/Navbar';
 import OverviewCards from './components/OverviewCards';
 import ChargerGrid from './components/ChargerGrid';
 import PipelineViewer from './components/PipelineViewer';
-import SimulatorControls from './components/SimulatorControls';
 import SecurityEventsTable from './components/SecurityEventsTable';
 import { fetchStats, fetchChargers, fetchEvents } from './services/api';
 import { socket } from './services/socket';
@@ -93,22 +92,19 @@ export default function App() {
         stats={stats}
       />
 
-      {/* Main Dashboard Workspace */}
+      {/* Main Security Dashboard */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         
         {/* Metric Summary Counters */}
         <OverviewCards stats={stats} />
 
-        {/* Interactive Charger & Attack Simulator */}
-        <SimulatorControls onActionComplete={loadAllData} />
-
-        {/* 6-Stage Detection Pipeline Inspector */}
+        {/* 6-Stage Detection Pipeline */}
         <PipelineViewer />
 
-        {/* Monitored EV Chargers Grid */}
+        {/* Monitored EV Charging Infrastructure */}
         <ChargerGrid chargers={chargers} />
 
-        {/* Live Security Audit Log */}
+        {/* Real-Time Security Incident & Audit Log */}
         <SecurityEventsTable events={events} />
 
       </main>
