@@ -39,10 +39,12 @@ class OcppGateway {
 
       // Store socket tracking
       const existing = this.activeSockets.get(chargerId);
-      if (existing && existing.socket.readyState === WebSocket.OPEN) {
-        // Track duplicate socket for impersonation check in detection pipeline
+      const isDuplicate = existing && existing.socket && existing.socket.readyState === WebSocket.OPEN && existing.connectionId !== connectionId;
+
+      if (isDuplicate) {
         ws.isDuplicate = true;
       } else {
+        ws.isDuplicate = false;
         this.activeSockets.set(chargerId, {
           socket: ws,
           ip: clientIp,
@@ -52,6 +54,11 @@ class OcppGateway {
       }
 
       ws.on('message', async (data) => {
+        // Re-check duplicate state dynamically in case primary socket changed
+        const currentActive = this.activeSockets.get(chargerId);
+        const dynamicDuplicate = currentActive && currentActive.connectionId !== connectionId && currentActive.socket.readyState === WebSocket.OPEN;
+        ws.isDuplicate = ws.isDuplicate || dynamicDuplicate;
+
         await this.handleIncomingMessage(ws, data);
       });
 
