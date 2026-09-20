@@ -77,7 +77,7 @@ ocppGateway.init(server, detectionPipeline, handleSecurityEvent);
 
 // Handle WebSocket upgrade for OCPP charger connections (ws://localhost:5000/ocpp/:chargerId)
 server.on('upgrade', (request, socket, head) => {
-  const pathname = request.url;
+  const pathname = request.url || '';
 
   if (pathname.startsWith('/ocpp')) {
     // Extract chargerId from URL: /ocpp/CP001 or /ocpp?chargerId=CP001
@@ -96,9 +96,8 @@ server.on('upgrade', (request, socket, head) => {
     ocppGateway.wss.handleUpgrade(request, socket, head, (ws) => {
       ocppGateway.wss.emit('connection', ws, request, chargerId);
     });
-  } else {
-    socket.destroy();
   }
+  // Let other upgrade requests (such as Socket.IO) be handled by their respective handlers
 });
 
 // Start Server
