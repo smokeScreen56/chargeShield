@@ -5,13 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node src/server.js",
-    "sim": "node src/simulator/cli.js",
-    "sim:normal": "node src/simulator/cli.js normal",
-    "sim:attack1": "node src/simulator/cli.js attack1",
-    "sim:attack2": "node src/simulator/cli.js attack2",
-    "sim:attack3": "node src/simulator/cli.js attack3",
-    "sim:unauthorized": "node src/simulator/cli.js unauthorized"
+    "dev": "node src/server.js"
   },
   "keywords": [
     "ocpp",
