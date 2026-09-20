@@ -5,7 +5,6 @@ import ChargerGrid from './components/ChargerGrid';
 import PipelineViewer from './components/PipelineViewer';
 import SimulatorControls from './components/SimulatorControls';
 import SecurityEventsTable from './components/SecurityEventsTable';
-import FutureScopePanel from './components/FutureScopePanel';
 import { fetchStats, fetchChargers, fetchEvents } from './services/api';
 import { socket } from './services/socket';
 
@@ -112,9 +111,6 @@ export default function App() {
         {/* Live Security Audit Log */}
         <SecurityEventsTable events={events} />
 
-        {/* Documented 40-50% Roadmap Scope */}
-        <FutureScopePanel />
-
       </main>
 
       {/* Footer */}
@@ -125,7 +121,7 @@ export default function App() {
           </div>
           <div className="flex items-center gap-4">
             <span>Author: <strong className="text-slate-400">smokeScreen56</strong></span>
-            <span>OCPP 1.6J Security Architecture</span>
+            <span>OCPP 1.6J</span>
           </div>
         </div>
       </footer>
