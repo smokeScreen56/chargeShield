@@ -1,0 +1,21 @@
+{
+  "name": "chargeshield-backend",
+  "version": "1.0.0",
+  "description": "Real-Time Cybersecurity Gateway for EV Charging Infrastructure - Backend",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
+  },
+  "keywords": ["ocpp", "ev", "security", "gateway", "cybersecurity"],
+  "author": "smokeScreen56",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongoose": "^8.9.5",
+    "socket.io": "^4.8.1",
+    "ws": "^8.18.0"
+  }
+}
