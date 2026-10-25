@@ -10,8 +10,60 @@ class OcppGateway {
   constructor() {
     this.wss = null;
     this.activeSockets = new Map(); // chargerId -> { socket, ip, connectedAt, connectionId }
+    this.upstreamSockets = new Map(); // chargerId -> WebSocket (to upstream CSMS)
+    this.csmsUrl = process.env.CSMS_URL || null;
     this.pipelineRunner = null;
     this.onSecurityEventCallback = null;
+  }
+
+  setCsmsUrl(url) {
+    this.csmsUrl = url;
+  }
+
+  /**
+   * Get or connect an upstream WebSocket to the central CSMS for a charger
+   */
+  async getOrConnectUpstream(chargerId, downstreamWs) {
+    if (!this.csmsUrl) return null;
+
+    let upstream = this.upstreamSockets.get(chargerId);
+    if (upstream && upstream.readyState === WebSocket.OPEN) {
+      return upstream;
+    }
+
+    return new Promise((resolve) => {
+      const targetUrl = `${this.csmsUrl.replace(/\/+$/, '')}/${chargerId}`;
+      const upstreamWs = new WebSocket(targetUrl);
+
+      const timeout = setTimeout(() => {
+        resolve(null);
+      }, 3000);
+
+      upstreamWs.on('open', () => {
+        clearTimeout(timeout);
+        this.upstreamSockets.set(chargerId, upstreamWs);
+        console.log(`[Gateway -> CSMS] Upstream connected for '${chargerId}' at ${targetUrl}`);
+        resolve(upstreamWs);
+      });
+
+      upstreamWs.on('message', (upstreamData) => {
+        // Relay upstream CSMS response back to the downstream charger
+        if (downstreamWs && downstreamWs.readyState === WebSocket.OPEN) {
+          downstreamWs.send(upstreamData);
+        }
+      });
+
+      upstreamWs.on('error', (err) => {
+        clearTimeout(timeout);
+        console.warn(`[Gateway -> CSMS] Upstream connection error on '${chargerId}': ${err.message}`);
+        resolve(null);
+      });
+
+      upstreamWs.on('close', () => {
+        console.log(`[Gateway -> CSMS] Upstream closed for '${chargerId}'`);
+        this.upstreamSockets.delete(chargerId);
+      });
+    });
   }
 
   /**
@@ -71,6 +123,13 @@ class OcppGateway {
         // Remove stale power readings on disconnect so aggregate grid load drops
         const gridCheck = require('../detection/gridCheck');
         gridCheck.removeChargerPower(chargerId);
+
+        // Close corresponding upstream socket if open
+        const upstream = this.upstreamSockets.get(chargerId);
+        if (upstream) {
+          try { upstream.close(); } catch (e) {}
+          this.upstreamSockets.delete(chargerId);
+        }
       });
 
       ws.on('error', (err) => {
@@ -157,12 +216,41 @@ class OcppGateway {
         return;
       }
 
-      // If ALLOW or ALERT, produce valid OCPP response (acting as the Central System/CSMS backend)
+      // If ALLOW or ALERT, relay to upstream CSMS if configured, or produce mock response
       console.log(`[Gateway] ✅ ALLOWED message [${actionName}] from ${ws.chargerId} (Risk: ${evaluation.riskScore})`);
+
+      if (this.csmsUrl) {
+        const upstream = await this.getOrConnectUpstream(ws.chargerId, ws);
+        if (upstream && upstream.readyState === WebSocket.OPEN) {
+          upstream.send(rawData);
+          return;
+        } else {
+          console.warn(`[Gateway -> CSMS] Upstream CSMS unavailable at ${this.csmsUrl}, generating standalone response for [${actionName}]`);
+        }
+      }
+
+      // Standalone mode or upstream unavailable: generate local mock OCPP response
       const backendResponse = this.generateOcppCallResult(actionName, uniqueId, payload);
       if (ws.readyState === WebSocket.OPEN && backendResponse) {
         ws.send(JSON.stringify(backendResponse));
       }
+    }
+  }
+
+  /**
+   * Close all active gateway and upstream connections
+   */
+  close() {
+    for (const [id, ws] of this.upstreamSockets.entries()) {
+      try { ws.close(); } catch (e) {}
+    }
+    this.upstreamSockets.clear();
+    for (const [id, conn] of this.activeSockets.entries()) {
+      try { conn.socket.close(); } catch (e) {}
+    }
+    this.activeSockets.clear();
+    if (this.wss) {
+      try { this.wss.close(); } catch (e) {}
     }
   }
 

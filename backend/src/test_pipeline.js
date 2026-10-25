@@ -398,10 +398,54 @@ async function runTests() {
     console.assert(sAtk5.actualVerdict === 'ALERT', `Iteration ${iteration} Attack 5 must be ALERT`);
   }
 
+  console.log('  -> All scenarios passed identically across back-to-back runs!');
+
+  // Test 10: Upstream CSMS Proxying and Conditional Forwarding
+  console.log('\n[Test 10] Upstream CSMS Proxy: Verify Forwarding of ALLOWED/ALERTED and Blocking of Attacks:');
+  const MockCsms = require('../scripts/mockCsms');
+  const mockCsms = new MockCsms(5555);
+  await mockCsms.start();
+
+  ocppGateway.setCsmsUrl('ws://localhost:5555/ocpp');
+
+  // 10.1: Normal Flow forwarding to CSMS
+  console.log('10.1: Normal Flow forwarding to CSMS...');
+  mockCsms.clear();
+  const normalResult = await chargerSimulator.runNormalFlow('CP001');
+  console.assert(normalResult.passed, '10.1 Normal flow should pass');
+  const csmsFrames = mockCsms.getReceivedFrames('CP001');
+  console.log(`  -> Frames received by upstream CSMS from CP001: ${csmsFrames.length}`);
+  console.assert(csmsFrames.length > 0, '10.1 Upstream CSMS should receive forwarded allowed frames');
+  const actionsReceived = csmsFrames.map(f => f.action);
+  console.log(`  -> Actions received by CSMS: ${actionsReceived.join(', ')}`);
+  console.assert(actionsReceived.includes('BootNotification'), 'CSMS should receive BootNotification');
+  console.assert(actionsReceived.includes('Heartbeat'), 'CSMS should receive Heartbeat');
+  console.assert(actionsReceived.includes('StartTransaction'), 'CSMS should receive StartTransaction');
+
+  // 10.2: Attack frame blocked and NOT forwarded to CSMS
+  console.log('10.2: Blocked attack frame must NEVER reach upstream CSMS...');
+  mockCsms.clear();
+  const attackResult = await chargerSimulator.runAttack2FakeMeter('CP002', 45.0);
+  console.assert(attackResult.actualVerdict === 'BLOCK', '10.2 Attack 2 must be BLOCK');
+  const attackFrames = mockCsms.getReceivedFrames('CP002');
+  const fakeMeterFrames = attackFrames.filter(f => f.action === 'MeterValues');
+  console.log(`  -> Fake MeterValues received by upstream CSMS: ${fakeMeterFrames.length}`);
+  console.assert(fakeMeterFrames.length === 0, '10.2 Blocked fake MeterValues must NEVER reach upstream CSMS!');
+
+  // 10.3: Disconnect cleanup of upstream socket
+  console.log('10.3: Charger disconnect closes upstream connection...');
+  await new Promise(r => setTimeout(r, 200));
+  console.assert(!ocppGateway.upstreamSockets.has('CP001'), 'CP001 upstream socket should be cleaned up after disconnect');
+  console.assert(!ocppGateway.upstreamSockets.has('CP002'), 'CP002 upstream socket should be cleaned up after disconnect');
+
+  // Teardown Mock CSMS & reset gateway URL
+  ocppGateway.setCsmsUrl(null);
+  await mockCsms.stop();
+  console.log('  -> Upstream CSMS proxy verification passed!');
+
   // Cleanup test server
   ocppGateway.close();
   await new Promise(r => testServer.close(r));
-  console.log('  -> All scenarios passed identically across back-to-back runs!');
 
   console.log('\n🎉 ALL PIPELINE UNIT TESTS PASSED SUCCESSFULLY!');
 }
