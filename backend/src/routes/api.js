@@ -11,12 +11,15 @@ const sessionCheck = require('../detection/sessionCheck');
 const ocppGateway = require('../gateway/ocppGateway');
 const chargerSimulator = require('../simulator/chargerSimulator');
 
+const gridCheck = require('../detection/gridCheck');
+
 // System Health & Overview
 router.get('/stats', async (req, res) => {
   try {
     const stats = await getStats();
     const connectedChargers = ocppGateway.getConnectedChargers();
     const sessionStates = sessionCheck.getAllSessionStates();
+    const gridStats = gridCheck.getGridStats();
 
     const activeSessionsCount = Object.values(sessionStates).filter(s => s.state === 'CHARGING').length;
 
@@ -28,8 +31,22 @@ router.get('/stats', async (req, res) => {
       messagesProcessed: stats.totalMessages,
       threatsDetected: stats.threatsCount,
       blockedMessages: stats.blockedCount,
-      isMongoConnected: stats.isMongoConnected
+      isMongoConnected: stats.isMongoConnected,
+      currentGridLoadKw: gridStats.currentLoadKw,
+      gridCapacityKw: gridStats.gridCapacityKw,
+      gridWarningThresholdKw: gridStats.warningThresholdKw,
+      gridUtilizationPercent: gridStats.utilizationPercent,
+      gridStatus: gridStats.status
     });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Grid Load Telemetry
+router.get('/grid', (req, res) => {
+  try {
+    res.json({ success: true, ...gridCheck.getGridStats() });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -115,6 +132,10 @@ router.post('/simulator/run', async (req, res) => {
       case 'attack_command_flooding':
         const floodCount = payload.count || 200;
         result = await chargerSimulator.runAttack4CommandFlooding(chargerId, floodCount);
+        break;
+
+      case 'attack_grid_load':
+        result = await chargerSimulator.runAttack5GridLoad();
         break;
 
       case 'single_message':

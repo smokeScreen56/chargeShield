@@ -224,6 +224,117 @@ async function runTests() {
   console.assert(postExpiryRes.action === SECURITY_ACTIONS.ALLOW, '7.5 Request after cooldown must be ALLOWED');
   console.log('  -> Traffic resumed after window expiry.');
 
+  // Test 8: Stage 6 - Grid Load Monitoring & Overload Protection
+  console.log('\n[Test 8] Stage 6: Grid Load (Below warning, Warning band, Over capacity, Load drop after stop):');
+  const gridCheck = require('./detection/gridCheck');
+  const { GRID_CONFIG } = require('./config/constants');
+  gridCheck.resetState();
+
+  // Helper to start session for a charger cleanly
+  const ensureChargingSession = async (chargerId, txId) => {
+    await detectionPipeline.inspectMessage({
+      chargerId,
+      raw: [2, `auth_${chargerId}`, 'Authorize', { idTag: 'GRID_TEST_TAG' }]
+    });
+    await detectionPipeline.inspectMessage({
+      chargerId,
+      raw: [2, `start_${chargerId}`, 'StartTransaction', {
+        connectorId: 1,
+        idTag: 'GRID_TEST_TAG',
+        meterStart: 500,
+        timestamp: new Date().toISOString()
+      }]
+    });
+  };
+
+  await ensureChargingSession('CP001', 101);
+  await ensureChargingSession('CP002', 102);
+  await ensureChargingSession('CP003', 103);
+
+  // 8.1: Below warning (CP001 reporting 7.0 kW -> total 7.0 kW < 28.0 kW warning)
+  console.log('8.1: Below warning threshold...');
+  const resBelow = await detectionPipeline.inspectMessage({
+    chargerId: 'CP001',
+    raw: [2, 'mv_cp1', 'MeterValues', {
+      connectorId: 1,
+      transactionId: 101,
+      meterValue: [{
+        timestamp: new Date().toISOString(),
+        sampledValue: [
+          { value: '7000', measurand: 'Power.Active.Import', unit: 'W' },
+          { value: '1000', measurand: 'Energy.Active.Import.Register', unit: 'Wh' }
+        ]
+      }]
+    }]
+  });
+  console.assert(resBelow.action === SECURITY_ACTIONS.ALLOW, '8.1 Expected ALLOW below warning');
+  console.assert(resBelow.severity === 'LOW', '8.1 Expected LOW severity');
+  console.log(`  -> Below warning passed: Load=${gridCheck.getGridStats().currentLoadKw} kW / ${GRID_CONFIG.GRID_CAPACITY_KW} kW`);
+
+  // 8.2: Warning band (CP002 reporting 21.5 kW -> total 7.0 + 21.5 = 28.5 kW >= 28.0 kW and <= 35.0 kW)
+  console.log('8.2: Warning band (>= 80%)...');
+  const resWarning = await detectionPipeline.inspectMessage({
+    chargerId: 'CP002',
+    raw: [2, 'mv_cp2', 'MeterValues', {
+      connectorId: 1,
+      transactionId: 102,
+      meterValue: [{
+        timestamp: new Date().toISOString(),
+        sampledValue: [
+          { value: '21500', measurand: 'Power.Active.Import', unit: 'W' },
+          { value: '2000', measurand: 'Energy.Active.Import.Register', unit: 'Wh' }
+        ]
+      }]
+    }]
+  });
+  console.assert(resWarning.action === SECURITY_ACTIONS.ALERT, '8.2 Expected ALERT in warning band');
+  console.assert(resWarning.severity === 'MEDIUM', '8.2 Expected MEDIUM severity in warning band');
+  console.assert(resWarning.detectionType === DETECTION_TYPES.GRID_LOAD_WARNING, '8.2 DetectionType mismatch');
+  console.log(`  -> Warning band triggered: Load=${gridCheck.getGridStats().currentLoadKw} kW (${gridCheck.getGridStats().utilizationPercent}%)`);
+
+  // 8.3: Over capacity (CP003 reporting 10.0 kW -> total 7.0 + 21.5 + 10.0 = 38.5 kW > 35.0 kW capacity)
+  console.log('8.3: Over capacity (> 100%)...');
+  const resOverload = await detectionPipeline.inspectMessage({
+    chargerId: 'CP003',
+    raw: [2, 'mv_cp3', 'MeterValues', {
+      connectorId: 1,
+      transactionId: 103,
+      meterValue: [{
+        timestamp: new Date().toISOString(),
+        sampledValue: [
+          { value: '10000', measurand: 'Power.Active.Import', unit: 'W' },
+          { value: '3000', measurand: 'Energy.Active.Import.Register', unit: 'Wh' }
+        ]
+      }]
+    }]
+  });
+  console.assert(resOverload.action === SECURITY_ACTIONS.ALERT, '8.3 Expected ALERT for grid overload');
+  console.assert(resOverload.severity === 'CRITICAL', '8.3 Expected CRITICAL severity for grid overload');
+  console.assert(resOverload.detectionType === DETECTION_TYPES.GRID_LOAD_EXCEEDED, '8.3 DetectionType mismatch');
+  console.log(`  -> Over capacity triggered: Load=${gridCheck.getGridStats().currentLoadKw} kW (${gridCheck.getGridStats().utilizationPercent}%)`);
+
+  // 8.4: Load dropping after StopTransaction (StopTransaction on CP002 removes 21.5 kW)
+  console.log('8.4: Load dropping after StopTransaction...');
+  const stopRes = await detectionPipeline.inspectMessage({
+    chargerId: 'CP002',
+    raw: [2, 'stop_cp2', 'StopTransaction', {
+      transactionId: 102,
+      meterStop: 5000,
+      timestamp: new Date().toISOString()
+    }]
+  });
+  console.assert(stopRes.action === SECURITY_ACTIONS.ALLOW, '8.4 StopTransaction should be ALLOWED');
+  const postStopStats = gridCheck.getGridStats();
+  console.log(`  -> Post-stop load: ${postStopStats.currentLoadKw} kW (Dropped from 38.5 kW)`);
+  console.assert(postStopStats.currentLoadKw === 17.0, `8.4 Expected 17.0 kW, got ${postStopStats.currentLoadKw}`);
+
+  // 8.5: Load dropping on charger disconnect
+  console.log('8.5: Load dropping on charger disconnect...');
+  gridCheck.removeChargerPower('CP003');
+  const finalStats = gridCheck.getGridStats();
+  console.assert(finalStats.currentLoadKw === 7.0, `8.5 Expected 7.0 kW, got ${finalStats.currentLoadKw}`);
+  console.log(`  -> Disconnect load: ${finalStats.currentLoadKw} kW`);
+
   console.log('\n🎉 ALL PIPELINE UNIT TESTS PASSED SUCCESSFULLY!');
 }
 

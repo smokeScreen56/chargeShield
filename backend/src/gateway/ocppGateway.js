@@ -68,6 +68,9 @@ class OcppGateway {
         if (current && current.connectionId === connectionId) {
           this.activeSockets.delete(chargerId);
         }
+        // Remove stale power readings on disconnect so aggregate grid load drops
+        const gridCheck = require('../detection/gridCheck');
+        gridCheck.removeChargerPower(chargerId);
       });
 
       ws.on('error', (err) => {

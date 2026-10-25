@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserCheck, FileCheck, Layers, Gauge, Target, ShieldCheck, ArrowRight } from 'lucide-react';
+import { UserCheck, FileCheck, Layers, Gauge, Activity, Zap } from 'lucide-react';
 
 export default function PipelineViewer() {
   const steps = [
@@ -30,26 +30,26 @@ export default function PipelineViewer() {
     {
       step: '4',
       title: 'Physics Check',
-      desc: 'Verify kW against rated capacity & meter rollback',
+      desc: 'Verify active power vs rated hardware kW & meter rollback',
       icon: Gauge,
       color: 'text-amber-400',
       border: 'border-amber-500/30'
     },
     {
       step: '5',
-      title: 'Risk Engine',
-      desc: 'Aggregate score (0-100) & assign risk severity band',
-      icon: Target,
-      color: 'text-orange-400',
-      border: 'border-orange-500/30'
+      title: 'Command Behavior',
+      desc: 'Sliding-window rate limiter (10s) & DoS flood protection',
+      icon: Activity,
+      color: 'text-rose-400',
+      border: 'border-rose-500/30'
     },
     {
       step: '6',
-      title: 'Decision Engine',
-      desc: 'Output deterministic ALLOW, BLOCK (CallError), or ALERT',
-      icon: ShieldCheck,
-      color: 'text-emerald-400',
-      border: 'border-emerald-500/30'
+      title: 'Grid Load Check',
+      desc: 'Monitor aggregate demand vs 35 kW substation capacity',
+      icon: Zap,
+      color: 'text-yellow-400',
+      border: 'border-yellow-500/30'
     }
   ];
 

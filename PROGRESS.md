@@ -12,26 +12,13 @@
   - Rules and constants structure established.
   - Initial `PROGRESS.md` created.
 
-- [ ] **Phase 1: Command / Behavior Analysis & Attack 4 Implementation**
-  - Configurable sliding-window rate limiter & command flooding detector in `backend/src/detection/commandBehaviorCheck.js`.
-  - Config constants in `config/constants.js` (flood thresholds, time window, max allowed per action).
-  - Pipeline integration in `backend/src/detection/index.js` (Identity -> OCPP -> Session -> Physics -> Command/Behavior -> Risk).
-  - Attack 4 simulation logic in `backend/src/simulator/chargerSimulator.js` (200 Reset commands in 10s).
-  - REST endpoint support in `backend/src/routes/api.js`.
-  - Automated tests in `backend/src/test_pipeline.js` validating Attack 4 rate limiting and blocking.
-
-- [ ] **Phase 2: Grid Load Protection & Attack 5 Implementation**
-  - Configurable grid capacity thresholds in `config/constants.js` (e.g. aggregate substation capacity in kW).
-  - Aggregate grid load tracking across concurrent charging sessions in `backend/src/detection/gridLoadCheck.js` or integrated physics layer.
-  - Critical Alert generation when concurrent demand exceeds grid capacity.
-  - Attack 5 simulation logic in `backend/src/simulator/chargerSimulator.js` (simulated overload exceeding grid capacity).
-  - REST endpoint support in `backend/src/routes/api.js`.
-  - Automated tests in `backend/src/test_pipeline.js` validating Attack 5 alert generation.
-
-- [ ] **Phase 3: Risk Scoring & Dynamic Decision Engine Refinement**
-  - Full severity band mapping (0–30 Low: ALLOW, 31–60 Medium: ALERT/FLAG, 61–80 High: BLOCK, 81–100 Critical: BLOCK + CRITICAL ALERT).
-  - Refinement of `riskEngine.js` to support both `ALERT` and `BLOCK` decision outputs according to severity specifications.
-  - Unit tests verifying multi-anomaly score compounding and severity band actions.
+- [x] **Phase 1: Complete Detection Pipeline (Stages 5 & 6, Risk Engine, Decision Policy)**
+  - **Risk Decision Policy (Part A)**: Decision policy in `config/constants.js` (LOW -> ALLOW, MEDIUM -> ALERT, HIGH/CRITICAL -> BLOCK). Added support for stage forced actions (e.g. forced ALERT on CRITICAL grid overload). Highest severity wins; risk scores aggregate. Attacks 1–3 still BLOCK.
+  - **Stage 5 Command Flooding (Part B)**: Sliding-window rate limiter in `backend/src/detection/commandCheck.js` (10s window, max 50 general, max 10 Resets, 15s cooldown). Drops flood traffic during cooldown, logging ONE aggregated event. Isolated per charger with old timestamp cleanup.
+  - **Stage 6 Grid Load Monitoring (Part C)**: Aggregate power monitoring across chargers in `backend/src/detection/gridCheck.js` against 35.0 kW capacity and 80% (28.0 kW) warning threshold. Triggers MEDIUM ALERT on warning, and CRITICAL ALERT on overload. Automatically drops power on StopTransaction or disconnect.
+  - **PipelineViewer Updated**: 6 stages reflected in the frontend pipeline visualizer.
+  - **Attack 4 & 5 Simulators Added**: `runAttack4CommandFlooding` (200 Reset frames in 10s) and `runAttack5GridLoad` (all 3 chargers pushed to 38.5 kW).
+  - **Automated Tests**: Unit tests 1–8 in `backend/src/test_pipeline.js` covering every risk band, forced action, flooding scenarios, and grid load conditions. Live backend verification passed.
 
 - [ ] **Phase 4: Frontend Simulation Control Panel & Live UI Polish**
   - Interactive Attack Simulation panel component in the React dashboard.

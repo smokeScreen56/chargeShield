@@ -9,6 +9,7 @@ const ocppValidation = require('./ocppValidation');
 const sessionCheck = require('./sessionCheck');
 const physicsCheck = require('./physicsCheck');
 const commandCheck = require('./commandCheck');
+const gridCheck = require('./gridCheck');
 const riskEngine = require('./riskEngine');
 const { SECURITY_ACTIONS } = require('../config/constants');
 
@@ -43,13 +44,18 @@ class DetectionPipeline {
     const commandResult = ocppResult.passed ? commandCheck.evaluate(context) : { passed: true, riskScore: 0 };
     pipelineSteps.push({ stage: 'Command Flooding', ...commandResult });
 
+    // Stage 6: Grid Load Check
+    const gridResult = ocppResult.passed ? gridCheck.evaluate(context) : { passed: true, riskScore: 0 };
+    pipelineSteps.push({ stage: 'Grid Load Check', ...gridResult });
+
     // Risk Scoring & Decision Engine
     const decision = riskEngine.computeScoreAndDecision([
       identityResult,
       ocppResult,
       sessionResult,
       physicsResult,
-      commandResult
+      commandResult,
+      gridResult
     ]);
 
     // Update session state if message is successfully ALLOWED or ALERTED (not BLOCKED)

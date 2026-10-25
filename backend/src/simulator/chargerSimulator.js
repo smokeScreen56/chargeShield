@@ -417,6 +417,59 @@ class ChargerSimulator {
       sampleErrors: errors
     };
   }
+
+  /**
+   * 🚨 Attack Scenario 5: Grid Overload Attack
+   * Pushes all 3 monitored chargers (CP001, CP002, CP003) near their rated capacities concurrently:
+   * CP001 (7.0 kW) + CP002 (21.0 kW) + CP003 (10.5 kW) = 38.5 kW (exceeds 35.0 kW grid capacity).
+   * Generates a CRITICAL ALERT without disconnecting legitimate grid power.
+   */
+  async runAttack5GridLoad() {
+    console.log('[Simulator] 🚨 Simulating Attack 5: Grid Load Overload across all 3 chargers...');
+    const results = [];
+
+    // Step 1: Start transactions on CP001, CP002, CP003 if not already running
+    await this.sendAuthorize('CP001', 'GRID_ATTACK_CARD');
+    const start1 = await this.sendStartTransaction('CP001', 1, 'GRID_ATTACK_CARD', 1000);
+    const tx1 = (start1.response && start1.response[2] && start1.response[2].transactionId) || 5001;
+    await new Promise(r => setTimeout(r, 200));
+
+    await this.sendAuthorize('CP002', 'GRID_ATTACK_CARD');
+    const start2 = await this.sendStartTransaction('CP002', 1, 'GRID_ATTACK_CARD', 2000);
+    const tx2 = (start2.response && start2.response[2] && start2.response[2].transactionId) || 5002;
+    await new Promise(r => setTimeout(r, 200));
+
+    await this.sendAuthorize('CP003', 'GRID_ATTACK_CARD');
+    const start3 = await this.sendStartTransaction('CP003', 1, 'GRID_ATTACK_CARD', 3000);
+    const tx3 = (start3.response && start3.response[2] && start3.response[2].transactionId) || 5003;
+    await new Promise(r => setTimeout(r, 200));
+
+    // Step 2: Ramp up CP001 to 7.0 kW (Rated: 7.4 kW)
+    const mv1 = await this.sendMeterValues('CP001', tx1, 7.0, 15.0);
+    results.push({ charger: 'CP001', powerKw: 7.0, result: mv1 });
+    await new Promise(r => setTimeout(r, 200));
+
+    // Step 3: Ramp up CP002 to 21.0 kW (Rated: 22.0 kW) -> Cumulative 28.0 kW (Enters 80% Warning Band)
+    const mv2 = await this.sendMeterValues('CP002', tx2, 21.0, 35.0);
+    results.push({ charger: 'CP002', powerKw: 21.0, result: mv2 });
+    await new Promise(r => setTimeout(r, 200));
+
+    // Step 4: Ramp up CP003 to 10.5 kW (Rated: 11.0 kW) -> Cumulative 38.5 kW (Exceeds 35.0 kW Capacity -> CRITICAL ALERT)
+    const mv3 = await this.sendMeterValues('CP003', tx3, 10.5, 25.0);
+    results.push({ charger: 'CP003', powerKw: 10.5, result: mv3 });
+
+    const totalKw = 7.0 + 21.0 + 10.5; // 38.5 kW
+    console.log(`[Simulator] Attack 5 completed: Aggregate demand = ${totalKw} kW (Grid Capacity: 35.0 kW)`);
+
+    return {
+      scenario: 'Attack 5 - Grid Load Overload',
+      totalDemandKw: totalKw,
+      gridCapacityKw: 35.0,
+      utilizationPercent: ((totalKw / 35.0) * 100).toFixed(1) + '%',
+      overCapacity: totalKw > 35.0,
+      details: results
+    };
+  }
 }
 
 module.exports = new ChargerSimulator();

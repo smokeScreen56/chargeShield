@@ -47,7 +47,8 @@ const RISK_WEIGHTS = {
   INVALID_SESSION: 30,
   MALFORMED_MESSAGE: 20,
   COMMAND_FLOODING: 30,
-  GRID_LOAD_ATTACK: 40  // Planned for future
+  GRID_LOAD_ATTACK: 40,
+  GRID_LOAD_WARNING: 20
 };
 
 // Command Flooding / Rate Limiting Configuration
@@ -56,6 +57,13 @@ const RATE_LIMIT_CONFIG = {
   MAX_MESSAGES_PER_WINDOW: 50, // Max general messages allowed per window per charger
   MAX_RESETS_PER_WINDOW: 10,   // Max Reset requests allowed per window per charger
   COOLDOWN_MS: 15000           // Cool-down duration after flooding threshold exceeded
+};
+
+// Substation Grid Load Monitoring Configuration
+const GRID_CONFIG = {
+  GRID_CAPACITY_KW: 35.0,             // Total configured grid capacity in kW
+  WARNING_THRESHOLD_PERCENT: 80,      // Warning threshold percentage
+  WARNING_THRESHOLD_KW: 28.0          // 80% of 35.0 kW = 28.0 kW
 };
 
 // Risk Severity Bands
@@ -99,6 +107,7 @@ const DETECTION_TYPES = {
   METER_ANOMALY: 'Meter Anomaly',
   METER_ROLLBACK: 'Meter Rollback',
   COMMAND_FLOODING: 'Command Flooding',
+  GRID_LOAD_WARNING: 'Grid Load Warning',
   GRID_LOAD_EXCEEDED: 'Grid Load Exceeded'
 };
 
@@ -107,6 +116,7 @@ module.exports = {
   REGISTERED_CHARGERS,
   RISK_WEIGHTS,
   RATE_LIMIT_CONFIG,
+  GRID_CONFIG,
   RISK_BANDS,
   SECURITY_ACTIONS,
   SEVERITY_LEVELS,

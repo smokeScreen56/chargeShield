@@ -45,11 +45,26 @@ const io = new SocketIOServer(server, {
   }
 });
 
+const gridCheck = require('./detection/gridCheck');
+
+async function getFullStats() {
+  const stats = await getStats();
+  const gridStats = gridCheck.getGridStats();
+  return {
+    ...stats,
+    currentGridLoadKw: gridStats.currentLoadKw,
+    gridCapacityKw: gridStats.gridCapacityKw,
+    gridWarningThresholdKw: gridStats.warningThresholdKw,
+    gridUtilizationPercent: gridStats.utilizationPercent,
+    gridStatus: gridStats.status
+  };
+}
+
 io.on('connection', (socket) => {
   console.log(`[Dashboard Socket] Client connected (${socket.id})`);
 
   // Send current stats on connect
-  getStats().then(stats => {
+  getFullStats().then(stats => {
     socket.emit('stats_update', stats);
   }).catch(() => {});
 
@@ -64,8 +79,8 @@ async function handleSecurityEvent(eventData) {
     const savedEvent = await saveEvent(eventData);
     io.emit('security_event', savedEvent);
 
-    // Also push updated aggregate stats
-    const stats = await getStats();
+    // Also push updated aggregate stats including grid metrics
+    const stats = await getFullStats();
     io.emit('stats_update', stats);
   } catch (err) {
     console.error('[Server] Error handling security event:', err.message);
