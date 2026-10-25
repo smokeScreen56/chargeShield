@@ -332,6 +332,91 @@ class ChargerSimulator {
     console.log(`[Simulator] 🚨 Simulating Unauthorized Charger: ${rogueId}`);
     return this.sendBootNotification(rogueId);
   }
+
+  /**
+   * 🚨 Attack Scenario 4: Command Flooding / DoS
+   * Sends rapid burst of Reset commands (default: 200 in rapid succession) to overwhelm backend.
+   */
+  async runAttack4CommandFlooding(targetCharger = 'CP001', count = 200) {
+    console.log(`[Simulator] 🚨 Simulating Attack 4: Command Flooding (${count} Reset requests on ${targetCharger})...`);
+
+    let allowedCount = 0;
+    let blockedCount = 0;
+    const errors = [];
+
+    // Ensure charger connection exists
+    let ws = this.activeSimulators.get(targetCharger);
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      await this.connectCharger(targetCharger);
+      ws = this.activeSimulators.get(targetCharger);
+    }
+
+    // Fire messages in rapid bursts
+    const sendBatch = async () => {
+      for (let i = 0; i < count; i++) {
+        const messageId = `flood_reset_${Date.now()}_${i}`;
+        const frame = [
+          OCPP_MESSAGE_TYPE.CALL,
+          messageId,
+          'Reset',
+          { type: 'Hard' }
+        ];
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(frame));
+        }
+
+        // Small micro-delay so event loop can process incoming messages in parallel
+        if (i % 20 === 0) {
+          await new Promise(r => setTimeout(r, 20));
+        }
+      }
+    };
+
+    // Listen for responses
+    const responsePromise = new Promise((resolve) => {
+      let totalReceived = 0;
+      const timeout = setTimeout(() => {
+        if (ws) ws.removeListener('message', onMsg);
+        resolve();
+      }, 4000);
+
+      const onMsg = (data) => {
+        try {
+          const resp = JSON.parse(data.toString());
+          if (resp[0] === OCPP_MESSAGE_TYPE.CALL_RESULT) {
+            allowedCount++;
+          } else if (resp[0] === OCPP_MESSAGE_TYPE.CALL_ERROR) {
+            blockedCount++;
+            if (errors.length < 3) {
+              errors.push(resp[3] || 'Security Error');
+            }
+          }
+          totalReceived++;
+          if (totalReceived >= count) {
+            clearTimeout(timeout);
+            if (ws) ws.removeListener('message', onMsg);
+            resolve();
+          }
+        } catch (e) {}
+      };
+
+      if (ws) ws.on('message', onMsg);
+    });
+
+    await Promise.all([sendBatch(), responsePromise]);
+
+    console.log(`[Simulator] Attack 4 complete: Sent ${count}, Allowed: ${allowedCount}, Blocked: ${blockedCount}`);
+    return {
+      scenario: 'Attack 4 - Command Flooding',
+      chargerId: targetCharger,
+      totalSent: count,
+      allowedCount,
+      blockedCount,
+      rateLimited: blockedCount > 0,
+      sampleErrors: errors
+    };
+  }
 }
 
 module.exports = new ChargerSimulator();

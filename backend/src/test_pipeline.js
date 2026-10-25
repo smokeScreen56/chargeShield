@@ -149,6 +149,81 @@ async function runTests() {
   console.assert(decCompound.severity === 'HIGH', '6.6 Severity Win Mismatch');
   console.assert(decCompound.action === SECURITY_ACTIONS.BLOCK, '6.6 Action Mismatch');
 
+  // Test 7: Stage 5 - Command Flooding & Rate Limiting
+  console.log('\n[Test 7] Stage 5: Command Flooding (Under limit, Over limit, Cooldown, Isolation, Expiry):');
+  const commandCheck = require('./detection/commandCheck');
+  const { RATE_LIMIT_CONFIG } = require('./config/constants');
+  commandCheck.resetState();
+
+  // 7.1: Under limit (Send 5 Reset commands from CP001)
+  console.log('7.1: Under limit...');
+  for (let i = 0; i < 5; i++) {
+    const res = await detectionPipeline.inspectMessage({
+      chargerId: 'CP001',
+      clientIp: '192.168.1.100',
+      raw: [2, `reset_${i}`, 'Reset', { type: 'Soft' }]
+    });
+    console.assert(res.action === SECURITY_ACTIONS.ALLOW, `7.1 Message ${i} should be ALLOWED`);
+  }
+  console.log('  -> 5 Resets passed normally.');
+
+  // 7.2: Over limit (Push until MAX_RESETS_PER_WINDOW is exceeded)
+  console.log('7.2: Over limit...');
+  let breachResult = null;
+  for (let i = 5; i <= RATE_LIMIT_CONFIG.MAX_RESETS_PER_WINDOW + 2; i++) {
+    const res = await detectionPipeline.inspectMessage({
+      chargerId: 'CP001',
+      clientIp: '192.168.1.100',
+      raw: [2, `reset_${i}`, 'Reset', { type: 'Soft' }]
+    });
+    if (res.action === SECURITY_ACTIONS.BLOCK && !res.silent) {
+      breachResult = res;
+    }
+  }
+  console.assert(breachResult !== null, '7.2 Flooding breach event must be detected');
+  console.assert(breachResult.detectionType === DETECTION_TYPES.COMMAND_FLOODING, '7.2 DetectionType mismatch');
+  console.assert(breachResult.severity === 'HIGH', '7.2 Severity must be HIGH');
+  console.assert(breachResult.action === SECURITY_ACTIONS.BLOCK, '7.2 Action must be BLOCK');
+  console.assert(breachResult.silent === false, '7.2 Primary breach event must not be silent');
+  console.log(`  -> Flooding breach detected: ${breachResult.reason}`);
+
+  // 7.3: Subsequent messages during cooldown are dropped silently
+  console.log('7.3: Cooldown dropping...');
+  const dropRes = await detectionPipeline.inspectMessage({
+    chargerId: 'CP001',
+    clientIp: '192.168.1.100',
+    raw: [2, 'reset_dropped', 'Reset', { type: 'Soft' }]
+  });
+  console.assert(dropRes.action === SECURITY_ACTIONS.BLOCK, '7.3 Dropped request must be BLOCKED');
+  console.assert(dropRes.silent === true, '7.3 Dropped request must be marked silent');
+  console.log('  -> Cooldown traffic dropped silently.');
+
+  // 7.4: Per-Charger Isolation (CP002 should NOT be affected by CP001 flood)
+  console.log('7.4: Per-charger isolation...');
+  const cp2Res = await detectionPipeline.inspectMessage({
+    chargerId: 'CP002',
+    clientIp: '192.168.1.102',
+    raw: [2, 'cp2_msg', 'Heartbeat', {}]
+  });
+  console.assert(cp2Res.action === SECURITY_ACTIONS.ALLOW, '7.4 CP002 should be ALLOWED despite CP001 flood');
+  console.log('  -> CP002 unaffected by CP001 flood.');
+
+  // 7.5: Window / Cooldown Expiry
+  console.log('7.5: Window expiry...');
+  // Artificially expire the cooldown on CP001
+  const cp1Entry = commandCheck.getChargerEntry('CP001');
+  cp1Entry.cooldownUntil = Date.now() - 1;
+  cp1Entry.generalTimestamps = [];
+  cp1Entry.resetTimestamps = [];
+
+  const postExpiryRes = await detectionPipeline.inspectMessage({
+    chargerId: 'CP001',
+    clientIp: '192.168.1.100',
+    raw: [2, 'reset_post_cooldown', 'Reset', { type: 'Soft' }]
+  });
+  console.assert(postExpiryRes.action === SECURITY_ACTIONS.ALLOW, '7.5 Request after cooldown must be ALLOWED');
+  console.log('  -> Traffic resumed after window expiry.');
+
   console.log('\n🎉 ALL PIPELINE UNIT TESTS PASSED SUCCESSFULLY!');
 }
 

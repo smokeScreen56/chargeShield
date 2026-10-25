@@ -126,8 +126,8 @@ class OcppGateway {
         }
       });
 
-      // Dispatch security event to callback (Database & Dashboard)
-      if (this.onSecurityEventCallback) {
+      // Dispatch security event to callback (Database & Dashboard) unless marked silent
+      if (this.onSecurityEventCallback && !evaluation.silent) {
         this.onSecurityEventCallback(evaluation);
       }
 

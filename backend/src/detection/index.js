@@ -8,6 +8,7 @@ const identityCheck = require('./identityCheck');
 const ocppValidation = require('./ocppValidation');
 const sessionCheck = require('./sessionCheck');
 const physicsCheck = require('./physicsCheck');
+const commandCheck = require('./commandCheck');
 const riskEngine = require('./riskEngine');
 const { SECURITY_ACTIONS } = require('../config/constants');
 
@@ -38,12 +39,17 @@ class DetectionPipeline {
     const physicsResult = ocppResult.passed ? physicsCheck.evaluate(context) : { passed: true, riskScore: 0 };
     pipelineSteps.push({ stage: 'Physics Check', ...physicsResult });
 
-    // Stage 5 & 6: Risk Scoring & Decision Engine
+    // Stage 5: Command Flooding / Behavior Analysis
+    const commandResult = ocppResult.passed ? commandCheck.evaluate(context) : { passed: true, riskScore: 0 };
+    pipelineSteps.push({ stage: 'Command Flooding', ...commandResult });
+
+    // Risk Scoring & Decision Engine
     const decision = riskEngine.computeScoreAndDecision([
       identityResult,
       ocppResult,
       sessionResult,
-      physicsResult
+      physicsResult,
+      commandResult
     ]);
 
     // Update session state if message is successfully ALLOWED or ALERTED (not BLOCKED)
@@ -61,6 +67,7 @@ class DetectionPipeline {
       riskScore: decision.riskScore,
       severity: decision.severity,
       action: decision.action,
+      silent: commandResult.silent || false,
       reason: decision.reasons.join(' | '),
       clientIp: clientIp || '127.0.0.1',
       payload: payload || {},

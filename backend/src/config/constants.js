@@ -46,8 +46,16 @@ const RISK_WEIGHTS = {
   METER_ROLLBACK: 30,
   INVALID_SESSION: 30,
   MALFORMED_MESSAGE: 20,
-  COMMAND_FLOODING: 30, // Planned for future
+  COMMAND_FLOODING: 30,
   GRID_LOAD_ATTACK: 40  // Planned for future
+};
+
+// Command Flooding / Rate Limiting Configuration
+const RATE_LIMIT_CONFIG = {
+  WINDOW_MS: 10000,            // 10-second sliding window
+  MAX_MESSAGES_PER_WINDOW: 50, // Max general messages allowed per window per charger
+  MAX_RESETS_PER_WINDOW: 10,   // Max Reset requests allowed per window per charger
+  COOLDOWN_MS: 15000           // Cool-down duration after flooding threshold exceeded
 };
 
 // Risk Severity Bands
@@ -98,6 +106,7 @@ module.exports = {
   OCPP_MESSAGE_TYPE,
   REGISTERED_CHARGERS,
   RISK_WEIGHTS,
+  RATE_LIMIT_CONFIG,
   RISK_BANDS,
   SECURITY_ACTIONS,
   SEVERITY_LEVELS,

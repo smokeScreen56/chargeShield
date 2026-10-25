@@ -112,6 +112,11 @@ router.post('/simulator/run', async (req, res) => {
         result = await chargerSimulator.runAttackUnauthorizedCharger('CP999');
         break;
 
+      case 'attack_command_flooding':
+        const floodCount = payload.count || 200;
+        result = await chargerSimulator.runAttack4CommandFlooding(chargerId, floodCount);
+        break;
+
       case 'single_message':
         result = await chargerSimulator.sendMessage(chargerId, payload.action || 'Heartbeat', payload.data || {});
         break;
