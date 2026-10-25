@@ -447,6 +447,168 @@ async function runTests() {
   ocppGateway.close();
   await new Promise(r => testServer.close(r));
 
+  // Test 11: MongoDB Persistence and In-Memory Fallback
+  console.log('\n[Test 11] Persistence: In-Memory Fallback & MongoDB Survival Across Backend Restart:');
+  const path = require('path');
+  const fs = require('fs');
+  const { spawn } = require('child_process');
+  const {
+    initDatabase,
+    disconnectDatabase,
+    saveEvent,
+    getEvents,
+    getStats,
+    clearEvents,
+    resetInMemoryStore
+  } = require('./models/SecurityEvent');
+
+  // 11.1: Fallback In-Memory Mode
+  console.log('11.1: Testing In-Memory Fallback Mode (pagination, filters, clearing)...');
+  await disconnectDatabase();
+  resetInMemoryStore();
+
+  const fbStats1 = await getStats();
+  console.assert(fbStats1.isMongoConnected === false, '11.1 Must be in fallback mode');
+
+  await saveEvent({
+    chargerId: 'CP001',
+    messageType: 'Authorize',
+    detectionType: 'Normal',
+    stage: 'Pipeline',
+    riskScore: 0,
+    severity: 'LOW',
+    action: 'ALLOW'
+  });
+  await saveEvent({
+    chargerId: 'CP001',
+    messageType: 'MeterValues',
+    detectionType: 'Meter Anomaly',
+    stage: 'Stage 3 Physics',
+    riskScore: 40,
+    severity: 'MEDIUM',
+    action: 'ALERT'
+  });
+  await saveEvent({
+    chargerId: 'CP002',
+    messageType: 'Reset',
+    detectionType: 'Command Flooding',
+    stage: 'Stage 5 Flood',
+    riskScore: 60,
+    severity: 'HIGH',
+    action: 'BLOCK'
+  });
+  await saveEvent({
+    chargerId: 'CP003',
+    messageType: 'MeterValues',
+    detectionType: 'Grid Overload',
+    stage: 'Stage 6 Grid',
+    riskScore: 70,
+    severity: 'CRITICAL',
+    action: 'ALERT',
+    aggregatedCount: 5
+  });
+
+  // Verify pagination
+  const page1 = await getEvents({ page: 1, limit: 2 });
+  console.assert(page1.events.length === 2, `Expected 2 events on page 1, got ${page1.events.length}`);
+  console.assert(page1.total === 4, `Expected 4 total events, got ${page1.total}`);
+  console.assert(page1.totalPages === 2, `Expected 2 total pages, got ${page1.totalPages}`);
+
+  // Verify severity filter
+  const critEvents = await getEvents({ severity: 'CRITICAL' });
+  console.assert(critEvents.events.length === 1, `Expected 1 CRITICAL event, got ${critEvents.events.length}`);
+  console.assert(critEvents.events[0].detectionType === 'Grid Overload', 'Severity filter mismatch');
+
+  // Verify clearing
+  await clearEvents();
+  const cleared = await getEvents();
+  console.assert(cleared.total === 0, 'In-memory events should be 0 after clearEvents');
+  console.log('  -> In-memory fallback mode verified!');
+
+  // 11.2: MongoDB Mode & Restart Persistence
+  console.log('11.2: Testing MongoDB Mode & Survival Across Backend Restart...');
+  const testDbDir = path.join(__dirname, '../test_mongo_persistence');
+  if (!fs.existsSync(testDbDir)) {
+    fs.mkdirSync(testDbDir, { recursive: true });
+  }
+
+  const mongoPort = 27018;
+  const mongodProc = spawn('mongod', ['--dbpath', testDbDir, '--port', String(mongoPort), '--bind_ip', '127.0.0.1'], {
+    stdio: 'ignore',
+    detached: false
+  });
+
+  // Wait for MongoDB to accept connections
+  await new Promise(r => setTimeout(r, 2000));
+
+  try {
+    const mongoUri = `mongodb://127.0.0.1:${mongoPort}/chargeshield_test`;
+    await initDatabase(mongoUri);
+
+    const mongoStats = await getStats();
+    console.assert(mongoStats.isMongoConnected === true, '11.2 MongoDB should be connected');
+    console.log('  -> Connected to local MongoDB instance.');
+
+    // Save event with all new fields
+    await saveEvent({
+      chargerId: 'CP_RESTART_TEST',
+      messageType: 'MeterValues',
+      detectionType: 'Grid Overload',
+      stage: 'Stage 6 Grid',
+      riskScore: 70,
+      severity: 'CRITICAL',
+      action: 'ALERT',
+      aggregatedCount: 3,
+      reason: 'Persistent test event'
+    });
+
+    console.log('  -> Saved test event to MongoDB with all fields (stage, severity, action, score, aggregatedCount).');
+
+    // Simulate backend restart: disconnect from MongoDB and wipe in-memory cache
+    console.log('  -> Simulating backend restart (disconnect mongoose + clear in-memory cache)...');
+    await disconnectDatabase();
+    resetInMemoryStore();
+
+    // Verify in-memory is empty
+    const duringRestart = await getEvents();
+    console.assert(duringRestart.total === 0, 'During restart in-memory store should be empty');
+
+    // Re-initialize database (as server bootstrap does on restart)
+    await initDatabase(mongoUri);
+
+    // Fetch persisted events from MongoDB
+    const postRestart = await getEvents({ chargerId: 'CP_RESTART_TEST' });
+    console.log(`  -> Retrieved ${postRestart.events.length} event(s) after restart.`);
+    console.assert(postRestart.events.length === 1, 'Event must survive backend restart in Mongo mode');
+
+    const recovered = postRestart.events[0];
+    console.assert(recovered.chargerId === 'CP_RESTART_TEST', 'chargerId mismatch');
+    console.assert(recovered.stage === 'Stage 6 Grid', 'stage mismatch');
+    console.assert(recovered.severity === 'CRITICAL', 'severity mismatch');
+    console.assert(recovered.action === 'ALERT', 'action mismatch');
+    console.assert(recovered.riskScore === 70, 'riskScore mismatch');
+    console.assert(recovered.aggregatedCount === 3, 'aggregatedCount mismatch');
+    console.log('  -> Verified event survived restart with all fields intact!');
+
+    // Test MongoDB clearEvents
+    await clearEvents();
+    const postClear = await getEvents();
+    console.assert(postClear.total === 0, 'MongoDB events should be 0 after clearEvents');
+
+    await disconnectDatabase();
+    console.log('  -> MongoDB persistence test passed!');
+  } finally {
+    try {
+      mongodProc.kill('SIGTERM');
+      await new Promise(r => setTimeout(r, 1000));
+    } catch (e) {}
+
+    // Clean up temporary database directory
+    try {
+      fs.rmSync(testDbDir, { recursive: true, force: true });
+    } catch (e) {}
+  }
+
   console.log('\n🎉 ALL PIPELINE UNIT TESTS PASSED SUCCESSFULLY!');
 }
 

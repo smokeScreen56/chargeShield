@@ -17,10 +17,32 @@
   - **Stage 5 Command Flooding (Part B)**: Sliding-window rate limiter in `backend/src/detection/commandCheck.js` (10s window, max 50 general, max 10 Resets, 15s cooldown). Drops flood traffic during cooldown, logging ONE aggregated event. Isolated per charger with old timestamp cleanup.
   - **Stage 6 Grid Load Monitoring (Part C)**: Aggregate power monitoring across chargers in `backend/src/detection/gridCheck.js` against 35.0 kW capacity and 80% (28.0 kW) warning threshold. Triggers MEDIUM ALERT on warning, and CRITICAL ALERT on overload. Automatically drops power on StopTransaction or disconnect.
   - **PipelineViewer Updated**: 6 stages reflected in the frontend pipeline visualizer.
-  - **Attack 4 & 5 Simulators Added**: `runAttack4CommandFlooding` (200 Reset frames in 10s) and `runAttack5GridLoad` (all 3 chargers pushed to 38.5 kW).
-  - **Automated Tests**: Unit tests 1–8 in `backend/src/test_pipeline.js` covering every risk band, forced action, flooding scenarios, and grid load conditions. Live backend verification passed.
+  - **Automated Tests**: Unit tests 1–8 in `backend/src/test_pipeline.js` covering every risk band, forced action, flooding scenarios, and grid load conditions.
 
-- [ ] **Phase 4: Frontend Simulation Control Panel & Live UI Polish**
+- [x] **Phase 2: Finish Simulator Scenarios & Backend Infrastructure**
+  - **Part A: Attacks 4 & 5 Simulator Scenarios & Cleanup**:
+    - Implemented `runAttack4CommandFlooding` (200 Reset commands rate limited/blocked) and `runAttack5GridLoad` (multi-charger aggregate overload reaching CRITICAL ALERT).
+    - Standardized all scenarios (`normal_flow`, `attack1-5`) to return structured JSON (`scenarioName`, `steps`, `eventsProduced`, `expectedVerdict`, `actualVerdict`, `passed`).
+    - Added environment cleanup (`resetEnvironment()` resetting rate limiter, physics history, session state, and grid readings) so repeated back-to-back runs give identical results.
+    - Hooked `attack_command_flooding` and `attack_grid_load` into `POST /api/simulator/run`.
+  - **Part B: Upstream CSMS Proxy**:
+    - Configured optional `CSMS_URL` env variable in `ocppGateway.js`.
+    - Per-charger upstream WebSocket connection opened dynamically.
+    - Conditional forwarding: `ALLOWED` and `ALERTED` frames are forwarded to upstream CSMS; `BLOCKED` frames are never forwarded and replied to with OCPP `CALLERROR`.
+    - Upstream responses relayed back to downstream chargers; upstream sockets cleaned up on charger disconnect.
+    - Built standalone `backend/scripts/mockCsms.js` recording all received frames and replying with standard OCPP CallResult frames.
+  - **Part C: MongoDB Persistence & In-Memory Fallback**:
+    - Created `.env.example` at repo root and `backend/.env.example`.
+    - Clear startup logging of database mode (`MONGODB` vs `IN-MEMORY FALLBACK`).
+    - Enhanced `SecurityEvent` schema and model to include `stage`, `severity`, `action`, `riskScore`, and `aggregatedCount`.
+    - Added query filtering (`severity`, `action`, `chargerId`) and pagination (`page`, `limit`, `totalPages`, `total`) to `GET /api/events`.
+    - Added `POST /api/events/clear` endpoint for demo resets.
+  - **Test Suite (Tests 9–11)**:
+    - Test 9: Runs all scenarios back-to-back twice, asserting identical verdicts.
+    - Test 10: Validates Mock CSMS forwarding (allowed traffic arrives, attack traffic blocked with 0 frames reaching CSMS, upstream socket disconnect cleanup).
+    - Test 11: Validates fallback mode pagination/filters/clear, and verifies MongoDB persistence where events survive a simulated backend restart.
+
+- [ ] **Phase 3: Frontend Simulation Control Panel & Live UI Polish**
   - Interactive Attack Simulation panel component in the React dashboard.
   - Buttons and status indicators for:
     - Normal Flow (Full lifecycle)
