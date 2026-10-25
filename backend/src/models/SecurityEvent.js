@@ -26,9 +26,13 @@ const SecurityEventSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  stage: {
+    type: String,
+    default: 'Pipeline'
+  },
   riskScore: {
     type: Number,
-    required: true,
+    required: true,      
     min: 0,
     max: 100
   },

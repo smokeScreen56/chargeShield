@@ -3,7 +3,7 @@
  * Tracks session state per charger and detects out-of-sequence or duplicate session anomalies.
  */
 
-const { RISK_WEIGHTS, DETECTION_TYPES } = require('../config/constants');
+const { RISK_WEIGHTS, DETECTION_TYPES, SECURITY_ACTIONS } = require('../config/constants');
 
 const SESSION_STATES = {
   IDLE: 'IDLE',
@@ -60,8 +60,11 @@ class SessionCheck {
         if (session.state === SESSION_STATES.CHARGING) {
           return {
             passed: false,
+            stage: 'Session Check',
             detectionType: DETECTION_TYPES.INVALID_SESSION,
             riskScore: RISK_WEIGHTS.INVALID_SESSION,
+            severity: 'HIGH',
+            forcedAction: SECURITY_ACTIONS.BLOCK,
             reason: `Invalid Session: StartTransaction received while charger '${chargerId}' already has active transaction ID #${session.activeTransactionId}.`
           };
         }
@@ -77,8 +80,11 @@ class SessionCheck {
         if (session.state !== SESSION_STATES.CHARGING) {
           return {
             passed: false,
+            stage: 'Session Check',
             detectionType: DETECTION_TYPES.INVALID_SESSION,
             riskScore: RISK_WEIGHTS.INVALID_SESSION,
+            severity: 'HIGH',
+            forcedAction: SECURITY_ACTIONS.BLOCK,
             reason: `Invalid Session: StopTransaction (Tx #${payload.transactionId || 'unknown'}) received on '${chargerId}' without an active charging session (current state: ${session.state}).`
           };
         }
@@ -94,8 +100,11 @@ class SessionCheck {
         if (session.state !== SESSION_STATES.CHARGING) {
           return {
             passed: false,
+            stage: 'Session Check',
             detectionType: DETECTION_TYPES.INVALID_SESSION,
             riskScore: RISK_WEIGHTS.INVALID_SESSION,
+            severity: 'HIGH',
+            forcedAction: SECURITY_ACTIONS.BLOCK,
             reason: `Invalid Session: MeterValues reported by '${chargerId}' while in ${session.state} state (no active transaction).`
           };
         }

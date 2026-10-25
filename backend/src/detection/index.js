@@ -46,8 +46,8 @@ class DetectionPipeline {
       physicsResult
     ]);
 
-    // Update session state if message is successfully ALLOWED
-    if (decision.action === SECURITY_ACTIONS.ALLOW && ocppResult.passed) {
+    // Update session state if message is successfully ALLOWED or ALERTED (not BLOCKED)
+    if (decision.action !== SECURITY_ACTIONS.BLOCK && ocppResult.passed) {
       sessionCheck.updateSessionOnSuccess(chargerId, action, payload);
     }
 
@@ -57,6 +57,7 @@ class DetectionPipeline {
       messageType: action || 'UNKNOWN',
       uniqueId: uniqueId || '0',
       detectionType: decision.primaryDetection,
+      stage: decision.primaryStage || 'Pipeline',
       riskScore: decision.riskScore,
       severity: decision.severity,
       action: decision.action,

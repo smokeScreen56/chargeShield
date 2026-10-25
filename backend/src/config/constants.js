@@ -65,6 +65,22 @@ const SECURITY_ACTIONS = {
   ALERT: 'ALERT'
 };
 
+// Severity Rank hierarchy
+const SEVERITY_LEVELS = {
+  LOW: 1,
+  MEDIUM: 2,
+  HIGH: 3,
+  CRITICAL: 4
+};
+
+// Decision Policy mapping severity band to default security action
+const DECISION_POLICY = {
+  LOW: SECURITY_ACTIONS.ALLOW,
+  MEDIUM: SECURITY_ACTIONS.ALERT,
+  HIGH: SECURITY_ACTIONS.BLOCK,
+  CRITICAL: SECURITY_ACTIONS.BLOCK
+};
+
 // Detection Types
 const DETECTION_TYPES = {
   NORMAL: 'Normal',
@@ -84,5 +100,7 @@ module.exports = {
   RISK_WEIGHTS,
   RISK_BANDS,
   SECURITY_ACTIONS,
+  SEVERITY_LEVELS,
+  DECISION_POLICY,
   DETECTION_TYPES
 };

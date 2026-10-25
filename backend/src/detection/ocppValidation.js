@@ -3,7 +3,7 @@
  * Verifies message structure, types, and mandatory field requirements.
  */
 
-const { OCPP_MESSAGE_TYPE, RISK_WEIGHTS, DETECTION_TYPES } = require('../config/constants');
+const { OCPP_MESSAGE_TYPE, RISK_WEIGHTS, DETECTION_TYPES, SECURITY_ACTIONS } = require('../config/constants');
 
 const KNOWN_ACTIONS = [
   'BootNotification',
@@ -19,72 +19,53 @@ class OcppValidation {
   /**
    * Evaluates OCPP 1.6J protocol compliance
    * @param {Object} context - { raw, chargerId }
-   * @returns {Object} - { passed, detectionType, riskScore, reason }
+   * @returns {Object} - { passed, detectionType, riskScore, reason, forcedAction, severity, stage }
    */
   evaluate(context) {
     const { raw, chargerId } = context;
 
+    // Helper for failure responses
+    const fail = (reason) => ({
+      passed: false,
+      stage: 'OCPP Validation',
+      detectionType: DETECTION_TYPES.MALFORMED_OCPP,
+      riskScore: RISK_WEIGHTS.MALFORMED_MESSAGE,
+      severity: 'MEDIUM',
+      forcedAction: SECURITY_ACTIONS.BLOCK,
+      reason
+    });
+
     // 1. Structure check: Must be an Array of length 4 for CALL messages
     if (!Array.isArray(raw)) {
-      return {
-        passed: false,
-        detectionType: DETECTION_TYPES.MALFORMED_OCPP,
-        riskScore: RISK_WEIGHTS.MALFORMED_MESSAGE,
-        reason: `Malformed OCPP message: Expected JSON array format.`
-      };
+      return fail('Malformed OCPP message: Expected JSON array format.');
     }
 
     const [messageTypeId, uniqueId, action, payload] = raw;
 
     // Check message type
     if (messageTypeId !== OCPP_MESSAGE_TYPE.CALL) {
-      return {
-        passed: false,
-        detectionType: DETECTION_TYPES.MALFORMED_OCPP,
-        riskScore: RISK_WEIGHTS.MALFORMED_MESSAGE,
-        reason: `Unsupported OCPP message type ID: ${messageTypeId}.`
-      };
+      return fail(`Unsupported OCPP message type ID: ${messageTypeId}.`);
     }
 
     // Check unique ID
     if (!uniqueId || typeof uniqueId !== 'string') {
-      return {
-        passed: false,
-        detectionType: DETECTION_TYPES.MALFORMED_OCPP,
-        riskScore: RISK_WEIGHTS.MALFORMED_MESSAGE,
-        reason: `Missing or invalid UniqueId in OCPP CALL frame.`
-      };
+      return fail('Missing or invalid UniqueId in OCPP CALL frame.');
     }
 
     // Check action
     if (!action || typeof action !== 'string' || !KNOWN_ACTIONS.includes(action)) {
-      return {
-        passed: false,
-        detectionType: DETECTION_TYPES.MALFORMED_OCPP,
-        riskScore: RISK_WEIGHTS.MALFORMED_MESSAGE,
-        reason: `Unrecognized or unsupported OCPP action '${action}'.`
-      };
+      return fail(`Unrecognized or unsupported OCPP action '${action}'.`);
     }
 
     // Check payload object
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-      return {
-        passed: false,
-        detectionType: DETECTION_TYPES.MALFORMED_OCPP,
-        riskScore: RISK_WEIGHTS.MALFORMED_MESSAGE,
-        reason: `Invalid payload for action '${action}': must be a JSON object.`
-      };
+      return fail(`Invalid payload for action '${action}': must be a JSON object.`);
     }
 
     // Basic required field checks for supported actions
     const fieldValidation = this.checkRequiredFields(action, payload);
     if (!fieldValidation.valid) {
-      return {
-        passed: false,
-        detectionType: DETECTION_TYPES.MALFORMED_OCPP,
-        riskScore: RISK_WEIGHTS.MALFORMED_MESSAGE,
-        reason: `Protocol schema violation in '${action}': ${fieldValidation.reason}`
-      };
+      return fail(`Protocol schema violation in '${action}': ${fieldValidation.reason}`);
     }
 
     return {

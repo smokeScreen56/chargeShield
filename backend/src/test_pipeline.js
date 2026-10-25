@@ -91,6 +91,64 @@ async function runTests() {
   console.assert(t5.detectionType === DETECTION_TYPES.INVALID_SESSION, 'Test 5 Detection Mismatch');
   console.assert(t5.riskScore === 30, 'Test 5 Risk Score Mismatch');
 
+  // Test 6: RiskEngine Decision Policy & Severity Bands
+  console.log('\n[Test 6] RiskEngine: Decision Policy & Bands (LOW, MEDIUM, HIGH, CRITICAL):');
+  const riskEngine = require('./detection/riskEngine');
+
+  // 6.1: LOW band (Score 20) -> ALLOW
+  const decLow = riskEngine.computeScoreAndDecision([
+    { passed: false, riskScore: 20, stage: 'CustomCheck', detectionType: 'MinorIssue' }
+  ]);
+  console.log(`6.1 LOW: Score=${decLow.riskScore}, Severity=${decLow.severity}, Action=${decLow.action}`);
+  console.assert(decLow.riskScore === 20, '6.1 Score Mismatch');
+  console.assert(decLow.severity === 'LOW', '6.1 Severity Mismatch');
+  console.assert(decLow.action === SECURITY_ACTIONS.ALLOW, '6.1 Action Mismatch');
+
+  // 6.2: MEDIUM band (Score 45) -> ALERT
+  const decMed = riskEngine.computeScoreAndDecision([
+    { passed: false, riskScore: 45, stage: 'CustomCheck', detectionType: 'MediumAnomaly' }
+  ]);
+  console.log(`6.2 MEDIUM: Score=${decMed.riskScore}, Severity=${decMed.severity}, Action=${decMed.action}`);
+  console.assert(decMed.riskScore === 45, '6.2 Score Mismatch');
+  console.assert(decMed.severity === 'MEDIUM', '6.2 Severity Mismatch');
+  console.assert(decMed.action === SECURITY_ACTIONS.ALERT, '6.2 Action Mismatch');
+
+  // 6.3: HIGH band (Score 70) -> BLOCK
+  const decHigh = riskEngine.computeScoreAndDecision([
+    { passed: false, riskScore: 70, stage: 'CustomCheck', detectionType: 'HighAnomaly' }
+  ]);
+  console.log(`6.3 HIGH: Score=${decHigh.riskScore}, Severity=${decHigh.severity}, Action=${decHigh.action}`);
+  console.assert(decHigh.riskScore === 70, '6.3 Score Mismatch');
+  console.assert(decHigh.severity === 'HIGH', '6.3 Severity Mismatch');
+  console.assert(decHigh.action === SECURITY_ACTIONS.BLOCK, '6.3 Action Mismatch');
+
+  // 6.4: CRITICAL band (Score 90) -> BLOCK
+  const decCrit = riskEngine.computeScoreAndDecision([
+    { passed: false, riskScore: 90, stage: 'CustomCheck', detectionType: 'SevereExploit' }
+  ]);
+  console.log(`6.4 CRITICAL: Score=${decCrit.riskScore}, Severity=${decCrit.severity}, Action=${decCrit.action}`);
+  console.assert(decCrit.riskScore === 90, '6.4 Score Mismatch');
+  console.assert(decCrit.severity === 'CRITICAL', '6.4 Severity Mismatch');
+  console.assert(decCrit.action === SECURITY_ACTIONS.BLOCK, '6.4 Action Mismatch');
+
+  // 6.5: Forced Action: Grid Overload (Forced ALERT with CRITICAL severity)
+  const decGridForced = riskEngine.computeScoreAndDecision([
+    { passed: false, riskScore: 40, stage: 'Grid Load Check', severity: 'CRITICAL', forcedAction: SECURITY_ACTIONS.ALERT, detectionType: 'Grid Load Exceeded' }
+  ]);
+  console.log(`6.5 Forced ALERT (CRITICAL): Score=${decGridForced.riskScore}, Severity=${decGridForced.severity}, Action=${decGridForced.action}`);
+  console.assert(decGridForced.severity === 'CRITICAL', '6.5 Severity Mismatch');
+  console.assert(decGridForced.action === SECURITY_ACTIONS.ALERT, '6.5 Forced Action Mismatch');
+
+  // 6.6: Compounding Scores & Highest Severity Wins
+  const decCompound = riskEngine.computeScoreAndDecision([
+    { passed: false, riskScore: 25, stage: 'CheckA', severity: 'LOW' },
+    { passed: false, riskScore: 40, stage: 'CheckB', severity: 'HIGH' }
+  ]);
+  console.log(`6.6 Compounding: Score=${decCompound.riskScore}, Severity=${decCompound.severity}, Action=${decCompound.action}`);
+  console.assert(decCompound.riskScore === 65, '6.6 Score Sum Mismatch');
+  console.assert(decCompound.severity === 'HIGH', '6.6 Severity Win Mismatch');
+  console.assert(decCompound.action === SECURITY_ACTIONS.BLOCK, '6.6 Action Mismatch');
+
   console.log('\n🎉 ALL PIPELINE UNIT TESTS PASSED SUCCESSFULLY!');
 }
 

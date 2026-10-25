@@ -5,7 +5,7 @@
  * 2. Meter rollback check (monotonically non-decreasing energy)
  */
 
-const { REGISTERED_CHARGERS, RISK_WEIGHTS, DETECTION_TYPES } = require('../config/constants');
+const { REGISTERED_CHARGERS, RISK_WEIGHTS, DETECTION_TYPES, SECURITY_ACTIONS } = require('../config/constants');
 
 class PhysicsCheck {
   constructor() {
@@ -62,8 +62,11 @@ class PhysicsCheck {
       if (meterStopWh < lastWh) {
         return {
           passed: false,
+          stage: 'Physics Check',
           detectionType: DETECTION_TYPES.METER_ROLLBACK,
           riskScore: RISK_WEIGHTS.METER_ROLLBACK,
+          severity: 'HIGH',
+          forcedAction: SECURITY_ACTIONS.BLOCK,
           reason: `Meter Rollback detected at StopTransaction: Final meter (${meterStopWh} Wh) is lower than previously recorded (${lastWh} Wh).`
         };
       }
@@ -123,8 +126,11 @@ class PhysicsCheck {
         if (reportedPowerKw > maxAllowedKw) {
           return {
             passed: false,
+            stage: 'Physics Check',
             detectionType: DETECTION_TYPES.METER_ANOMALY,
             riskScore: RISK_WEIGHTS.METER_ANOMALY,
+            severity: 'HIGH',
+            forcedAction: SECURITY_ACTIONS.BLOCK,
             reason: `Physics Anomaly: Reported active power (${reportedPowerKw.toFixed(1)} kW) exceeds rated hardware capacity (${ratedPowerKw} kW) for charger '${chargerId}'.`,
             metrics: { reportedPowerKw, ratedPowerKw }
           };
@@ -138,8 +144,11 @@ class PhysicsCheck {
         if (lastWh !== undefined && reportedEnergyWh < lastWh) {
           return {
             passed: false,
+            stage: 'Physics Check',
             detectionType: DETECTION_TYPES.METER_ROLLBACK,
             riskScore: RISK_WEIGHTS.METER_ROLLBACK,
+            severity: 'HIGH',
+            forcedAction: SECURITY_ACTIONS.BLOCK,
             reason: `Meter Rollback detected: Reported energy (${reportedEnergyWh} Wh) decreased from last recorded (${lastWh} Wh).`,
             metrics: { reportedEnergyWh, lastWh }
           };
