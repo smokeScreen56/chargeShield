@@ -79,12 +79,20 @@ router.get('/chargers', (req, res) => {
   }
 });
 
-// Get Security Events Log
+const { getEvents, getRecentEvents, getStats, clearEvents } = require('../models/SecurityEvent');
+
+// Get Security Events Log (supports limit, severity filter, action filter, and pagination)
 router.get('/events', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit, 10) || 50;
-    const events = await getRecentEvents(limit);
-    res.json({ success: true, count: events.length, events });
+    const result = await getEvents(req.query);
+    res.json({
+      success: true,
+      count: result.events.length,
+      total: result.total,
+      page: result.page,
+      totalPages: result.totalPages,
+      events: result.events
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

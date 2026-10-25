@@ -21,6 +21,13 @@ class PhysicsCheck {
   }
 
   /**
+   * Reset all meter histories
+   */
+  resetAllHistory() {
+    this.meterHistory.clear();
+  }
+
+  /**
    * Evaluate physics & meter constraints for incoming message
    * @param {Object} context - { chargerId, raw }
    * @returns {Object} - { passed, detectionType, riskScore, reason, extractedMetrics }

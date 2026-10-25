@@ -335,6 +335,74 @@ async function runTests() {
   console.assert(finalStats.currentLoadKw === 7.0, `8.5 Expected 7.0 kW, got ${finalStats.currentLoadKw}`);
   console.log(`  -> Disconnect load: ${finalStats.currentLoadKw} kW`);
 
+  // Test 9: Simulator Scenarios (Normal + Attacks 1-5) Run Twice Back-to-Back
+  console.log('\n[Test 9] Simulator Scenarios: Running All Scenarios Twice Back-to-Back (Cleanup & Verdicts):');
+  const http = require('http');
+  const ocppGateway = require('./gateway/ocppGateway');
+  const chargerSimulator = require('./simulator/chargerSimulator');
+
+  const testServer = http.createServer();
+  ocppGateway.init(testServer, detectionPipeline, () => {});
+
+  testServer.on('upgrade', (request, socket, head) => {
+    const pathname = request.url || '';
+    if (pathname.startsWith('/ocpp')) {
+      const parts = pathname.split('/').filter(Boolean);
+      const chargerId = parts[1] || 'UNKNOWN';
+      ocppGateway.wss.handleUpgrade(request, socket, head, (ws) => {
+        ocppGateway.wss.emit('connection', ws, request, chargerId);
+      });
+    }
+  });
+
+  await new Promise((resolve) => testServer.listen(5002, resolve));
+  chargerSimulator.setGatewayUrl('ws://localhost:5002/ocpp');
+
+  for (let iteration = 1; iteration <= 2; iteration++) {
+    console.log(`\n  >> Scenario Suite Iteration ${iteration} of 2...`);
+
+    // 9.1: Normal Flow
+    const sNormal = await chargerSimulator.runNormalFlow('CP001');
+    console.log(`    [Normal Flow]: Expected=${sNormal.expectedVerdict}, Actual=${sNormal.actualVerdict}`);
+    console.assert(sNormal.passed, `Iteration ${iteration} Normal Flow failed`);
+    console.assert(sNormal.actualVerdict === 'ALLOW', `Iteration ${iteration} Normal Flow must be ALLOW`);
+
+    // 9.2: Attack 1 - Charger Impersonation
+    const sAtk1 = await chargerSimulator.runAttack1Impersonation('CP001');
+    console.log(`    [Attack 1]: Expected=${sAtk1.expectedVerdict}, Actual=${sAtk1.actualVerdict}`);
+    console.assert(sAtk1.passed, `Iteration ${iteration} Attack 1 failed`);
+    console.assert(sAtk1.actualVerdict === 'BLOCK', `Iteration ${iteration} Attack 1 must be BLOCK`);
+
+    // 9.3: Attack 2 - Fake Meter Reading
+    const sAtk2 = await chargerSimulator.runAttack2FakeMeter('CP001', 25.0);
+    console.log(`    [Attack 2]: Expected=${sAtk2.expectedVerdict}, Actual=${sAtk2.actualVerdict}`);
+    console.assert(sAtk2.passed, `Iteration ${iteration} Attack 2 failed`);
+    console.assert(sAtk2.actualVerdict === 'BLOCK', `Iteration ${iteration} Attack 2 must be BLOCK`);
+
+    // 9.4: Attack 3 - Invalid Session
+    const sAtk3 = await chargerSimulator.runAttack3InvalidSession('CP002');
+    console.log(`    [Attack 3]: Expected=${sAtk3.expectedVerdict}, Actual=${sAtk3.actualVerdict}`);
+    console.assert(sAtk3.passed, `Iteration ${iteration} Attack 3 failed`);
+    console.assert(sAtk3.actualVerdict === 'BLOCK', `Iteration ${iteration} Attack 3 must be BLOCK`);
+
+    // 9.5: Attack 4 - Command Flooding
+    const sAtk4 = await chargerSimulator.runAttack4CommandFlooding('CP001', 40);
+    console.log(`    [Attack 4]: Expected=${sAtk4.expectedVerdict}, Actual=${sAtk4.actualVerdict}`);
+    console.assert(sAtk4.passed, `Iteration ${iteration} Attack 4 failed`);
+    console.assert(sAtk4.actualVerdict === 'BLOCK', `Iteration ${iteration} Attack 4 must be BLOCK`);
+
+    // 9.6: Attack 5 - Grid Load Attack
+    const sAtk5 = await chargerSimulator.runAttack5GridLoad();
+    console.log(`    [Attack 5]: Expected=${sAtk5.expectedVerdict}, Actual=${sAtk5.actualVerdict}`);
+    console.assert(sAtk5.passed, `Iteration ${iteration} Attack 5 failed`);
+    console.assert(sAtk5.actualVerdict === 'ALERT', `Iteration ${iteration} Attack 5 must be ALERT`);
+  }
+
+  // Cleanup test server
+  ocppGateway.close();
+  await new Promise(r => testServer.close(r));
+  console.log('  -> All scenarios passed identically across back-to-back runs!');
+
   console.log('\n🎉 ALL PIPELINE UNIT TESTS PASSED SUCCESSFULLY!');
 }
 

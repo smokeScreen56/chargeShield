@@ -18,6 +18,22 @@ class SessionCheck {
   }
 
   /**
+   * Reset session state for a charger
+   */
+  resetSession(chargerId) {
+    if (chargerId) {
+      this.sessions.delete(chargerId);
+    }
+  }
+
+  /**
+   * Reset all session states across all chargers
+   */
+  resetAllSessions() {
+    this.sessions.clear();
+  }
+
+  /**
    * Get or initialize session state for a charger
    */
   getSession(chargerId) {
