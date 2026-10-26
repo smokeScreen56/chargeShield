@@ -68,7 +68,33 @@
     - Verified real-time event streaming into dispatch log, stage trap gates, and analogue gauge needle movement.
     - Verified zero console errors.
 
-- [ ] **Phase 4: Full End-to-End Validation & Documentation Polish**
-  - Upstream forwarding proxy end-to-end confirmation with standalone `scripts/mockCsms.js`.
-  - Final integration audit across all components (Backend + OCPP Sockets + React UI + Simulator).
-  - Documentation and architecture diagram updates in `README.md`.
+- [x] **Phase 4: Full End-to-End Validation & Documentation Polish**
+  - **Fresh-Start Verification**: Executed automated test suite (`src/test_pipeline.js`) with 11/11 tests passing.
+  - **Live Scenario Exercising**: Completed manual testing of all 6 scenarios in forward and reverse orders on live Chrome DevTools session.
+  - **Code Polish**: Removed dead code, duplicate imports, and verified zero stale "Planned for future" / TODO comments across the repository.
+  - **Comprehensive README.md**: Published complete documentation featuring an ASCII architecture diagram, 6-stage pipeline verification table, run instructions (standalone, mock CSMS, MongoDB), 5 attack specifications, and a step-by-step presenter demo script.
+  - **Status & Limitations**: Updated `PROGRESS.md` with complete phase checklist and honest disclosure of known limitations.
+
+---
+
+## Known Limitations & Architectural Boundaries
+
+While ChargeShield delivers robust, real-time protection against protocol, behavioral, and physical anomalies, the following limitations should be noted:
+
+1. **Protocol Scope (OCPP 1.6-J JSON Only)**
+   - ChargeShield is purpose-built for **OCPP 1.6-J (JSON over WebSockets)**, the most widely deployed commercial standard today.
+   - It does not currently implement **OCPP 2.0.1** (which introduces ISO 15118 vehicle certificates and device management) or legacy **OCPP-S (SOAP/XML)**.
+
+2. **In-Memory Gateway State vs. Distributed Clustering**
+   - Active session states, sliding-window rate limiters, and aggregate grid power metrics are managed in-memory on the active gateway instance.
+   - For multi-instance, horizontally scaled gateway deployments behind a layer-4 load balancer, a distributed cache layer (such as Redis with atomic token buckets) would be needed to maintain synchronized state across nodes.
+
+3. **Telemetry-Dependent Grid Calculations**
+   - Stage 6 (Feeder Grid Monitoring) computes aggregate load from active power readings reported by chargers (`Power.Active.Import` in `MeterValues`).
+   - If a compromised or faulty charger suppresses its telemetry or reports zero wattage while drawing current, the software gateway cannot detect the discrepancy without external utility hardware/substation CT clamp meters.
+
+4. **Upstream Proxy Single-Hop Forwarding**
+   - The upstream CSMS proxy maintains a 1-to-1 WebSocket pairing per active charger. In enterprise production environments, TLS termination (WSS) and mutual TLS (mTLS) client certificates are assumed to be handled by an ingress controller (e.g., NGINX, Cloudflare, or Traefik) upstream of the gateway.
+
+5. **Simulated vs. Physical EVSE Hardware**
+   - The integrated attack test rig simulates standard OCPP 1.6-J client frames. Real-world EVSE units may occasionally emit vendor-specific proprietary extensions (DataTransfer actions) which pass through as generic payloads if not strictly registered.
