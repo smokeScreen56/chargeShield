@@ -42,19 +42,33 @@
     - Test 10: Validates Mock CSMS forwarding (allowed traffic arrives, attack traffic blocked with 0 frames reaching CSMS, upstream socket disconnect cleanup).
     - Test 11: Validates fallback mode pagination/filters/clear, and verifies MongoDB persistence where events survive a simulated backend restart.
 
-- [ ] **Phase 3: Frontend Simulation Control Panel & Live UI Polish**
-  - Interactive Attack Simulation panel component in the React dashboard.
-  - Buttons and status indicators for:
-    - Normal Flow (Full lifecycle)
-    - Attack 1: Charger Impersonation
-    - Attack 2: Fake Meter Reading
-    - Attack 3: Invalid Session
-    - Attack 4: Command Flooding
-    - Attack 5: Grid Overload Attack
-  - Pipeline viewer alignment with all stages (including Command Behavior and Grid Load).
-  - Live execution feedback, attack status toasts/badges, and event highlighting.
+- [x] **Phase 3: Frontend Redesign & Attack Control Panel (Substation Control-Room Logbook)**
+  - **Design System ("Substation Control-Room Logbook")**:
+    - Complete ban on generic SaaS visuals (no blue/purple gradients, no glassmorphism, no Inter/system fonts, no uniform rounded cards).
+    - Warm off-white paper canvas (`#F5F2EB`) with subtle engineering graph paper grid lines.
+    - Character-driven typography: **Fraunces** display serif/slab paired with **Bricolage Grotesque** and **IBM Plex Mono / JetBrains Mono**.
+    - Thick 2px ink borders, hard offset drop shadows (`shadow-hard` with 0 blur), label-maker tape badges, dashed ledger dividers, and ticket-stub styling.
+    - Rubber stamp verdicts: `BLOCKED` (-2° stamp with thunk animation), `ALERT` (+1° hazard amber stamp), `PASSED` (+1° operational green stamp).
+    - Conveyor Railway: Horizontal mechanical rail of 6 stations (`STN-01` to `STN-06`) with an animated `[PKT-1.6J]` token traveling across and lockout trap gates.
+    - Substation Feeder Gauge: Real analogue SVG dial needle gauge with color-coded normal, warning (>80%), and critical overload arcs with rotational easing.
+  - **Interactive Scenario Injection Test Rig (`SimulatorPanel.jsx`)**:
+    - 6 physical push-buttons with one-line descriptions and expected ChargeShield responses:
+      1. Normal Flow (`ALLOW`)
+      2. Attack 1: Charger Impersonation (`BLOCK`)
+      3. Attack 2: Fake Meter Reading (`BLOCK`)
+      4. Attack 3: Invalid Session Sequence (`BLOCK`)
+      5. Attack 4: Command Flooding DoS (`BLOCK`)
+      6. Attack 5: Grid Overload Attack (`ALERT`)
+    - Real-time execution handling: buttons disable while running with a "BUSY" indicator; live expected vs. actual verdict comparison banner with stamp animation.
+    - Reset Demo button for demo resets and log clearing.
+    - Full responsiveness verified down to mobile widths (375x812) with zero overflow.
+  - **Browser Verification**:
+    - Executed all 6 scenarios in forward order (01 → 06) and reverse order (06 → 01) via live Chrome DevTools browser session.
+    - Confirmed each scenario returns exact expected vs. actual match (`VERIFIED MATCH / TEST PASSED`).
+    - Verified real-time event streaming into dispatch log, stage trap gates, and analogue gauge needle movement.
+    - Verified zero console errors.
 
-- [ ] **Phase 5: Upstream CSMS Proxying & Full End-to-End Validation**
-  - Upstream forwarding proxy support for ALLOWED messages to target OCPP Central System / CSMS.
-  - End-to-end integration verification (Backend + Sockets + Frontend + Simulator).
-  - Documentation completion in `README.md`.
+- [ ] **Phase 4: Full End-to-End Validation & Documentation Polish**
+  - Upstream forwarding proxy end-to-end confirmation with standalone `scripts/mockCsms.js`.
+  - Final integration audit across all components (Backend + OCPP Sockets + React UI + Simulator).
+  - Documentation and architecture diagram updates in `README.md`.
