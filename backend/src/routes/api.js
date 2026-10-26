@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { REGISTERED_CHARGERS } = require('../config/constants');
-const { getRecentEvents, getStats, clearEvents } = require('../models/SecurityEvent');
+const { getEvents, getRecentEvents, getStats, clearEvents } = require('../models/SecurityEvent');
 const sessionCheck = require('../detection/sessionCheck');
 const ocppGateway = require('../gateway/ocppGateway');
 const chargerSimulator = require('../simulator/chargerSimulator');
@@ -78,9 +78,6 @@ router.get('/chargers', (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
-const { getEvents, getRecentEvents, getStats, clearEvents } = require('../models/SecurityEvent');
-
 // Get Security Events Log (supports limit, severity filter, action filter, and pagination)
 router.get('/events', async (req, res) => {
   try {

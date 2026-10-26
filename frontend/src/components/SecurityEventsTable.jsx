@@ -1,218 +1,243 @@
 import React, { useState } from 'react';
-import { ShieldCheck, ShieldAlert, AlertCircle, ChevronDown, ChevronUp, Filter } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, AlertTriangle, ChevronDown, ChevronUp, Filter, Trash2 } from 'lucide-react';
 
-export default function SecurityEventsTable({ events }) {
+export default function SecurityEventsTable({ events, onClearEvents }) {
   const [filterAction, setFilterAction] = useState('ALL');
   const [expandedRow, setExpandedRow] = useState(null);
 
   const filteredEvents = events.filter(evt => {
     if (filterAction === 'BLOCKED') return evt.action === 'BLOCK';
+    if (filterAction === 'ALERT') return evt.action === 'ALERT';
     if (filterAction === 'ALLOWED') return evt.action === 'ALLOW';
     if (filterAction === 'THREATS') return evt.detectionType !== 'Normal';
     return true;
   });
 
-  const getSeverityBadge = (severity, score) => {
-    let style = 'bg-slate-800 text-slate-300 border-slate-700';
-    if (severity === 'CRITICAL' || score >= 81) {
-      style = 'bg-red-950/60 text-red-300 border-red-800';
-    } else if (severity === 'HIGH' || score >= 61) {
-      style = 'bg-orange-950/60 text-orange-300 border-orange-800';
-    } else if (severity === 'MEDIUM' || score >= 31) {
-      style = 'bg-amber-950/60 text-amber-300 border-amber-800';
-    } else {
-      style = 'bg-emerald-950/60 text-emerald-300 border-emerald-800';
-    }
-
-    return (
-      <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-semibold border ${style}`}>
-        {severity || 'LOW'} ({score || 0})
-      </span>
-    );
-  };
-
-  const getActionBadge = (action) => {
+  const getVerdictStamp = (action, isNew = false) => {
     if (action === 'BLOCK') {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-950/60 text-rose-300 border border-rose-800">
-          <ShieldAlert className="w-3 h-3" />
-          BLOCK
-        </span>
+        <div className={`inline-block border-2 border-status-red bg-[#FEF2F2] text-status-red px-2.5 py-0.5 text-xs font-mono font-black tracking-widest uppercase -rotate-2 ${isNew ? 'animate-stamp-thunk' : ''}`}>
+          BLOCKED
+        </div>
       );
     }
     if (action === 'ALERT') {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-950/60 text-amber-300 border border-amber-800">
-          <AlertCircle className="w-3 h-3" />
+        <div className="inline-block border-2 border-signal-amber bg-[#FFFBEB] text-signal-amber px-2.5 py-0.5 text-xs font-mono font-black tracking-wider uppercase rotate-1">
           ALERT
-        </span>
+        </div>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-950/60 text-emerald-300 border border-emerald-800">
-        <ShieldCheck className="w-3 h-3" />
-        ALLOW
+      <div className="inline-block border-2 border-status-green bg-[#F0FDF4] text-status-green px-2 py-0.5 text-xs font-mono font-bold tracking-wider uppercase rotate-1">
+        PASSED
+      </div>
+    );
+  };
+
+  const getSeverityBadge = (severity, score) => {
+    const sev = severity || (score >= 60 ? 'HIGH' : score >= 30 ? 'MEDIUM' : 'LOW');
+    let badgeClass = 'border-ink-black/40 text-ink-muted bg-paper-card';
+
+    if (sev === 'CRITICAL' || score >= 70) {
+      badgeClass = 'border-status-red text-status-red bg-[#FEF2F2] font-black';
+    } else if (sev === 'HIGH' || score >= 50) {
+      badgeClass = 'border-signal-amber text-signal-amber bg-[#FFFBEB] font-bold';
+    } else if (sev === 'MEDIUM' || score >= 20) {
+      badgeClass = 'border-status-amber text-status-amber bg-[#FEF3C7] font-semibold';
+    } else {
+      badgeClass = 'border-status-green text-status-green bg-[#F0FDF4]';
+    }
+
+    return (
+      <span className={`px-1.5 py-0.5 border text-[10px] font-mono ${badgeClass}`}>
+        {sev} ({score ?? 0})
       </span>
     );
   };
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 backdrop-blur-sm">
-      {/* Header & Filter Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+    <section className="bg-paper-card border-2 border-ink-black shadow-hard p-4 sm:p-5" aria-label="Security Incident and Inspection Ledger">
+      
+      {/* Table Header & Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-3 border-b-2 border-ink-black gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-white">Live Security Events & Audit Log</h2>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-mono">
-              Real-Time Stream
-            </span>
+            <span className="w-2.5 h-2.5 bg-signal-amber border border-ink-black inline-block"></span>
+            <h2 className="font-display text-base sm:text-lg font-bold text-ink-black tracking-tight">
+              GATEWAY INTERCEPT & DISPATCH LOG
+            </h2>
           </div>
-          <p className="text-xs text-slate-400">
-            Real-time inspection decisions and risk scores for processed OCPP messages
+          <p className="text-xs font-mono text-ink-muted">
+            Chronological inspection records with per-station diagnostic telemetry
           </p>
         </div>
 
-        {/* Filter Buttons */}
-        <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-lg border border-slate-800 text-xs">
-          {['ALL', 'THREATS', 'BLOCKED', 'ALLOWED'].map((key) => (
+        {/* Filter Index Tabs & Clear Button */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex border-2 border-ink-black bg-paper-warm p-0.5 shadow-hard-sm">
+            {['ALL', 'THREATS', 'BLOCKED', 'ALERT', 'ALLOWED'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setFilterAction(tab)}
+                className={`px-2.5 py-1 text-[11px] font-mono font-bold transition-all ${
+                  filterAction === tab
+                    ? 'bg-ink-black text-white shadow-sm'
+                    : 'text-ink-muted hover:text-ink-black hover:bg-paper-card'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          {onClearEvents && (
             <button
-              key={key}
-              onClick={() => setFilterAction(key)}
-              className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
-                filterAction === key
-                  ? 'bg-sky-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
+              onClick={onClearEvents}
+              title="Clear logged events"
+              className="p-1.5 border-2 border-ink-black bg-paper-card hover:bg-[#FEE2E2] hover:text-status-red text-ink-muted shadow-hard-sm active:translate-x-0.5 active:translate-y-0.5 transition-all text-xs font-mono"
             >
-              {key}
+              <Trash2 className="w-4 h-4" />
             </button>
-          ))}
+          )}
         </div>
       </div>
 
-      {/* Events Table */}
-      <div className="overflow-x-auto border border-slate-800/80 rounded-lg">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-950/90 text-slate-400 border-b border-slate-800 uppercase text-[10px] tracking-wider font-semibold">
-            <tr>
-              <th className="py-3 px-3">Time</th>
-              <th className="py-3 px-3">Charger</th>
-              <th className="py-3 px-3">Message Action</th>
-              <th className="py-3 px-3">Detection Type</th>
-              <th className="py-3 px-3">Risk & Severity</th>
-              <th className="py-3 px-3 text-center">Decision</th>
-              <th className="py-3 px-3 text-right">Details</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800/60">
-            {filteredEvents.length === 0 ? (
-              <tr>
-                <td colSpan="7" className="py-8 text-center text-slate-500">
-                  No security events recorded yet. Trigger a scenario above to test the gateway!
-                </td>
-              </tr>
-            ) : (
-              filteredEvents.map((evt, idx) => {
-                const isExpanded = expandedRow === (evt._id || idx);
-                const timeStr = new Date(evt.timestamp).toLocaleTimeString();
+      {/* Ticket-Stub Log Entries */}
+      <div className="space-y-2.5">
+        {filteredEvents.length === 0 ? (
+          <div className="p-8 text-center border-2 border-dashed border-ink-black/40 bg-paper-warm/50 text-ink-muted font-mono text-xs">
+            <p className="font-bold text-ink-black">No security events recorded in ledger.</p>
+            <p className="mt-1">Execute a scenario from the Test Rig above to inject live OCPP frames.</p>
+          </div>
+        ) : (
+          filteredEvents.map((evt, idx) => {
+            const isExpanded = expandedRow === (evt._id || idx);
+            const timeStr = evt.timestamp ? new Date(evt.timestamp).toLocaleTimeString() : 'LIVE';
+            const isBlocked = evt.action === 'BLOCK';
+            const isAlert = evt.action === 'ALERT';
 
-                return (
-                  <React.Fragment key={evt._id || idx}>
-                    <tr
-                      className={`hover:bg-slate-800/40 transition-colors ${
-                        evt.action === 'BLOCK' ? 'bg-rose-950/10' : ''
-                      }`}
-                    >
-                      <td className="py-2.5 px-3 text-slate-400 font-mono whitespace-nowrap">
-                        {timeStr}
-                      </td>
+            return (
+              <div
+                key={evt._id || idx}
+                className={`border-2 border-ink-black bg-paper-card transition-all ${
+                  isBlocked
+                    ? 'bg-[#FEF2F2]/40 border-status-red shadow-hard-red'
+                    : isAlert
+                    ? 'bg-[#FFFBEB]/50 border-signal-amber shadow-hard-amber'
+                    : 'shadow-hard-sm hover:bg-paper-warm/60'
+                }`}
+              >
+                {/* Main Ticket Stub Row */}
+                <div
+                  onClick={() => setExpandedRow(isExpanded ? null : (evt._id || idx))}
+                  className="p-3 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-2.5"
+                >
+                  {/* Left: Timestamp + Charger + Action */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="font-mono text-xs font-bold text-ink-muted bg-paper-warm px-1.5 py-0.5 border border-ink-black/40">
+                      {timeStr}
+                    </span>
 
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        <span className={`font-mono font-semibold ${
-                          evt.chargerId === 'CP999' ? 'text-rose-400' : 'text-slate-200'
-                        }`}>
-                          {evt.chargerId}
-                        </span>
-                      </td>
+                    <span className={`font-mono text-xs font-black px-1.5 py-0.5 border-2 ${
+                      evt.chargerId === 'CP999'
+                        ? 'border-status-red bg-status-red text-white'
+                        : 'border-ink-black bg-paper-card text-ink-black'
+                    }`}>
+                      {evt.chargerId}
+                    </span>
 
-                      <td className="py-2.5 px-3 font-mono font-medium text-sky-300 whitespace-nowrap">
-                        {evt.messageType}
-                      </td>
+                    <span className="font-mono text-xs font-bold text-ink-black">
+                      [{evt.messageType || 'OCPP_MSG'}]
+                    </span>
 
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        <span className={evt.detectionType !== 'Normal' ? 'text-rose-300 font-semibold' : 'text-slate-400'}>
-                          {evt.detectionType}
-                        </span>
-                      </td>
+                    <span className="text-xs font-mono text-ink-muted hidden sm:inline">
+                      → {evt.detectionType || 'Normal Inspection'}
+                    </span>
+                  </div>
 
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        {getSeverityBadge(evt.severity, evt.riskScore)}
-                      </td>
-
-                      <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                        {getActionBadge(evt.action)}
-                      </td>
-
-                      <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => setExpandedRow(isExpanded ? null : (evt._id || idx))}
-                          className="p-1 text-slate-400 hover:text-slate-200 rounded hover:bg-slate-800"
-                        >
-                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
-                      </td>
-                    </tr>
-
-                    {/* Expandable Diagnostic Panel */}
-                    {isExpanded && (
-                      <tr className="bg-slate-950/80">
-                        <td colSpan="7" className="p-4 border-t border-slate-800/80">
-                          <div className="space-y-2">
-                            <div>
-                              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
-                                Diagnostic Reason:
-                              </span>
-                              <p className="text-xs text-slate-200 font-mono mt-0.5 bg-slate-900 p-2 rounded border border-slate-800">
-                                {evt.reason || 'No additional errors recorded.'}
-                              </p>
-                            </div>
-
-                            {evt.pipelineSteps && evt.pipelineSteps.length > 0 && (
-                              <div>
-                                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
-                                  Pipeline Stage Breakdown:
-                                </span>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
-                                  {evt.pipelineSteps.map((s, sIdx) => (
-                                    <div
-                                      key={sIdx}
-                                      className={`p-2 rounded border text-[11px] font-mono ${
-                                        s.passed
-                                          ? 'bg-slate-900 border-slate-800 text-slate-300'
-                                          : 'bg-rose-950/40 border-rose-800 text-rose-300 font-semibold'
-                                      }`}
-                                    >
-                                      <div className="flex justify-between">
-                                        <span>{s.stage}</span>
-                                        <span>{s.passed ? '✓' : '✗'}</span>
-                                      </div>
-                                      {!s.passed && <div className="text-[10px] text-rose-400 mt-0.5 truncate">{s.reason}</div>}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                  {/* Right: Stage Tag + Severity + Rubber Stamp + Toggle */}
+                  <div className="flex items-center gap-3 self-end md:self-auto">
+                    {evt.stage && (
+                      <span className="text-[10px] font-mono text-ink-muted bg-paper-recessed px-1.5 py-0.5 border border-ink-black/20 hidden lg:inline">
+                        {evt.stage}
+                      </span>
                     )}
-                  </React.Fragment>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+
+                    {getSeverityBadge(evt.severity, evt.riskScore)}
+
+                    {/* Rubber Stamp Verdict */}
+                    <div>
+                      {getVerdictStamp(evt.action, idx === 0)}
+                    </div>
+
+                    <div className="text-ink-muted hover:text-ink-black p-0.5">
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Perforated Divider for Expanded Slip */}
+                {isExpanded && (
+                  <div className="border-t-2 border-dashed border-ink-black p-3.5 bg-paper-warm/80 font-mono text-xs space-y-2">
+                    
+                    {/* Reason Banner */}
+                    <div>
+                      <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider">
+                        DIAGNOSTIC VERDICT SUMMARY:
+                      </span>
+                      <p className="mt-1 p-2 bg-paper-card border-2 border-ink-black text-ink-black font-mono text-xs leading-relaxed">
+                        {evt.reason || 'Frame cleared all 6 pipeline checkpoints without anomalies.'}
+                      </p>
+                    </div>
+
+                    {/* Aggregated Traffic Dropped Counter if flooding */}
+                    {evt.aggregatedCount > 1 && (
+                      <div className="p-2 border-2 border-status-red bg-[#FEF2F2] text-status-red text-xs font-bold flex justify-between">
+                        <span>⚠️ FLOOD GOVERNOR ACTIVE:</span>
+                        <span>{evt.aggregatedCount} DUPLICATE FRAMES SUPPRESSED DURING COOL-DOWN</span>
+                      </div>
+                    )}
+
+                    {/* Pipeline Breakdown Stations */}
+                    {evt.pipelineSteps && evt.pipelineSteps.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider">
+                          STATION-BY-STATION INSPECTOR TRAIL:
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 mt-1">
+                          {evt.pipelineSteps.map((step, sIdx) => (
+                            <div
+                              key={sIdx}
+                              className={`p-1.5 border text-[10px] font-mono ${
+                                step.passed
+                                  ? 'bg-paper-card border-ink-black/30 text-ink-black'
+                                  : 'bg-[#FEF2F2] border-status-red text-status-red font-bold'
+                              }`}
+                            >
+                              <div className="flex justify-between">
+                                <span className="truncate">{step.stage || `STN-${sIdx + 1}`}</span>
+                                <span>{step.passed ? '✓' : '✗'}</span>
+                              </div>
+                              {!step.passed && step.reason && (
+                                <div className="text-[9px] text-status-red mt-0.5 truncate" title={step.reason}>
+                                  {step.reason}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
-    </div>
+
+    </section>
   );
 }
