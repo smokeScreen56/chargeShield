@@ -211,27 +211,7 @@ npm test
 # Or run directly:
 node src/test_pipeline.js
 ```
-
 All 11 unit & integration test suites will execute and verify with 0 regressions.
-
----
-
-## Suggested Demo Script
-
-Use this sequence for presentations, technical evaluations, or project defense:
-
-| Step | Action | What to Explain to the Audience |
-|---|---|---|
-| **1. Overview & Logbook** | Open `http://localhost:5173/`. Point to the header, metric ledger, and conveyor railway. | *"Notice the Substation Control-Room Logbook design. We have rejected generic SaaS templates in favor of a field engineer's physical logbook aesthetic—warm paper stock, 2px carbon ink borders, Fraunces display typography, and real hard drop shadows."* |
-| **2. Normal Charging Flow** | Click **`01 Normal Flow`** in the Scenario Injection Test Rig. | *"Here a legitimate charger CP001 executes a full charging cycle: BootNotification, Authorize, StartTransaction, 11kW MeterValues, and StopTransaction. Watch the conveyor token [PKT-1.6J] clear all 6 stations. Notice the green PASSED rubber stamp in the log."* |
-| **3. Attack 1: Impersonation** | Click **`02 Attack 1: Impersonation`**. | *"Now an attacker attempts to hijack CP001 by opening a duplicate WebSocket connection with the same identity. Notice how Stage 1 Identity Intercept detects the socket collision, trips a lockout gate, and slams down a red BLOCKED stamp. Upstream never sees this connection."* |
-| **4. Attack 2: Fake Meter** | Click **`03 Attack 2: Fake Meter`**. | *"Here a compromised charger reports 45.0 kW active power on a hardware terminal only rated for 22.0 kW. Protocol-wise, the MeterValues syntax is valid JSON. But Stage 4 Physics Check recognizes the physical impossibility and blocks it with a SecurityError."* |
-| **5. Attack 3: Invalid Session** | Click **`04 Attack 3: Invalid Session`**. | *"The attacker attempts to inject MeterValues telemetry without initiating a session. Stage 3 Session FSM detects the state machine violation and immediately drops the message."* |
-| **6. Attack 4: Command Flood** | Click **`05 Attack 4: Command Flood`**. | *"Here 40 Reset commands are flooded in seconds. Stage 5 Flood Barrier enforces a 10s sliding-window rate limit, dropping the flood traffic. Rather than spamming the database with 40 entries, it aggregates the dropped traffic into a single audit entry."* |
-| **7. Attack 5: Grid Overload** | Click **`06 Attack 5: Grid Overload`**. Watch the analogue dial gauge. | *"Finally, an adversary ramps up all 3 charging pedestals to 38.5 kW simultaneously. Watch the analogue needle sweep past the 28 kW warning band right into the red danger zone (>35.0 kW). Stage 6 trips a CRITICAL ALERT, raising emergency warnings across the substation."* |
-| **8. Clean Reset** | Click **`RESET RIG & CLEAR LOGS`**. | *"With one click, the test rig cleans up active transactions, resets the rate limiter, clears the grid load back to 0 kW, and wipes the audit ledger for the next test."* |
-
----
 
 ## License & Attribution
 
